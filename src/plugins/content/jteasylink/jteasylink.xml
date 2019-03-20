@@ -20,12 +20,12 @@
         <fields name="params">
 
             <fieldset name="basic">
-                <field name="licensekey"
+                <field name="apikey"
                        type="text"
                        default=""
                        filter="alnum"
-                       label="PLG_CONTENT_JTEASYLINK_LICENSEKEY_LABEL"
-                       description="PLG_CONTENT_JTEASYLINK_LICENSEKEY_DESC"
+                       label="PLG_CONTENT_JTEASYLINK_APIKEY_LABEL"
+                       description="PLG_CONTENT_JTEASYLINK_APIKEY_DESC"
                 />
                 <field name="language"
                        type="list"
@@ -47,7 +47,7 @@
                 </field>
                 <field name="cachetime"
                        type="text"
-                       default="60"
+                       default="1440"
                        label="PLG_CONTENT_JTEASYLINK_CACHETIME_LABEL"
                        description="PLG_CONTENT_JTEASYLINK_CACHETIME_DESC"
                        filter="int"
@@ -58,7 +58,7 @@
 
                 <field name="methode"
                        type="radio"
-                       class="btn-group"
+                       class="btn-group btn-group-yesno"
                        default="html"
                        label="PLG_CONTENT_JTEASYLINK_METHODE_LABEL"
                        description="PLG_CONTENT_JTEASYLINK_METHODE_DESC"
@@ -111,12 +111,12 @@
                 />
                 <field name="debug"
                        type="radio"
-                       class="btn-group"
+                       class="btn-group btn-group-yesno"
                        default="0"
                        label="PLG_CONTENT_JTEASYLINK_DEBUG_LABEL"
                        description="PLG_CONTENT_JTEASYLINK_DEBUG_DESC">
-                    <option value="0">JOFF</option>
-                    <option value="1">JON</option>
+                    <option value="1">JOFF</option>
+                    <option value="0">JON</option>
                 </field>
             </fieldset>
 

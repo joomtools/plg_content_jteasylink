@@ -15,8 +15,8 @@ use Joomla\CMS\Factory;
 use Joomla\CMS\Filesystem\File;
 use Joomla\CMS\Filesystem\Folder;
 use Joomla\CMS\Language\Text;
-use Joomla\CMS\Uri\Uri;
 use Joomla\CMS\Profiler\Profiler;
+use Joomla\CMS\Uri\Uri;
 
 /**
  * Class plgContentJteasylink
@@ -29,6 +29,13 @@ use Joomla\CMS\Profiler\Profiler;
  */
 class PlgContentJteasylink extends JPlugin
 {
+	/**
+	 * Set css once
+	 *
+	 * @var     boolean
+	 * @since   1.0.0
+	 */
+	static $cssSet = false;
 	/**
 	 * Affects constructor behavior. If true, language files will be loaded automatically.
 	 *
@@ -69,6 +76,7 @@ class PlgContentJteasylink extends JPlugin
 	private $documentCalls = [
 		'dse' => 'PLG_CONTENT_JTEASYLINK_CALL_DSE_LABEL',
 		//'imp' => 'PLG_CONTENT_JTEASYLINK_CALL_IMP_LABEL',
+		//'agb' => 'PLG_CONTENT_JTEASYLINK_CALL_AGB_LABEL',
 	];
 
 	/**
@@ -92,17 +100,14 @@ class PlgContentJteasylink extends JPlugin
 		{
 			return;
 		}
-		// Startzeit und Speichernutzung für Auswertung
+		// Set starttime for process total time
 		$startTime = microtime(1);
 
-		$debug = filter_var(
-			$this->params->get('debug', 0),
-			FILTER_VALIDATE_BOOLEAN
-		);
+		$debug = $this->params->get('debug', 0) == '0' ? true : false;
 
 		if ($debug)
 		{
-			Profiler::getInstance('JT - Easylink')->setStart($startTime);
+			Profiler::getInstance('JT - Easylink (' . $context . ')')->setStart($startTime);
 		}
 
 		$useCss = filter_var(
@@ -118,27 +123,35 @@ class PlgContentJteasylink extends JPlugin
 		);
 
 		$methode     = $this->params->get('methode', 'html');
-		$licenseKey  = $this->params->get('licensekey', '');
+		$apiKey      = trim($this->params->get('apikey', ''));
 		$defaultLang = $this->params->get('language', 'de');
 		$activeLang  = strtolower(substr(Factory::getLanguage()->getTag(), 0, 2));
 		$language    = in_array($activeLang, $this->supportedLangguages) ? $activeLang : $defaultLang;
 		$domain      = Uri::getInstance()->getHost();
-		$domain      = 'kunze-medien.de';
+		$domain      = 'degobbis.de';
 
-		if (empty($licenseKey))
+		if (empty($apiKey))
 		{
 			$this->app->enqueueMessage(
-				Text::_('PLG_CONTENT_JTEASYLINK_WARNING_NO_LICENSEKEY'),
+				Text::_('PLG_CONTENT_JTEASYLINK_WARNING_NO_APIKEY'),
 				'error'
 			);
 
 			return;
 		}
 
-		if(strlen($licenseKey) != 25)
+		if(strlen($apiKey) == 26)
+		{
+			$apiKey = substr($apiKey, 0, -1);
+		}
+
+		// Add identifier for usage of Joomla!
+		$apiKey .= 'J';
+
+		if(strlen($apiKey) != 26)
 		{
 			$this->app->enqueueMessage(
-				Text::_('PLG_CONTENT_JTEASYLINK_WRONG_LICENSEKEY'),
+				Text::_('PLG_CONTENT_JTEASYLINK_WRONG_APIKEY'),
 				'error'
 			);
 
@@ -159,6 +172,9 @@ class PlgContentJteasylink extends JPlugin
 
 		foreach ($plgCalls[0] as $key => $plgCall)
 		{
+			// Pause prevent DB#1062 Duplicate entry database error (primary key)
+			sleep(1);
+
 			$callType = trim(strtolower($plgCalls[1][$key][0]));
 			$fileName = $callType . '.html';
 
@@ -184,13 +200,7 @@ class PlgContentJteasylink extends JPlugin
 				}
 			}
 
-			$cacheFile        = $cachePath . '/' . $language . '/' . $fileName;
-			$easylawServerUrl = 'https://easyrechtssicher.de/api/download/'
-				. $callType . '/'
-				. $licenseKey . '/'
-				. $language . '/'
-				. $domain . '.'
-				. $methode;
+			$cacheFile = $cachePath . '/' . $language . '/' . $fileName;
 
 			if (!Folder::exists(dirname($cacheFile)))
 			{
@@ -204,28 +214,57 @@ class PlgContentJteasylink extends JPlugin
 
 			if($useCacheFile === false)
 			{
+				// Alte URL
+				//$easylawServerUrl = 'https://easyrechtssicher.de/api/download/'
+				//. $callType . '/'
+				//. $apiKey . '/'
+				//. $language . '/'
+				//. $domain . '.'
+				//. $methode;
+
+				$easylawServerUrl = 'https://er' . $callType . '.net/'
+					. $apiKey . '/'
+					. $language . '/'
+					. $domain . '.'
+					. $methode;
+
 				if ($methode == 'html')
 				{
 					$buffer = $this->getHtml($cacheFile, $easylawServerUrl);
 				}
 				else
 				{
-					$buffer = $this->getJson($cacheFile, $easylawServerUrl, $language);
+					$buffer = $this->getJson($cacheFile, $easylawServerUrl);
 				}
+
+				if (!empty($buffer))
+				{
+					$this->setCache($cacheFile, $buffer);
+				}
+				else
+				{
+					if ($cacheOnOff === true)
+					{
+						$buffer = $this->getCache($cacheFile);
+					}
+				}
+
 			}
 			else
 			{
-				$buffer = $this->getBuffer($cacheFile);
+				$buffer = $this->getCache($cacheFile);
 			}
 
 			$article->text = str_replace($plgCall, $buffer, $article->text);
 		}
 
-		if ($methode == 'json' && $useCss)
+		if ($methode == 'json' && $useCss && !self::$cssSet)
 		{
 			$css = $this->params->get('css');
 
 			Factory::getDocument()->addStyleDeclaration($css);
+
+			self::$cssSet = true;
 		}
 
 
@@ -246,7 +285,7 @@ class PlgContentJteasylink extends JPlugin
 			}
 
 			$this->app->enqueueMessage(
-				Profiler::getInstance('JT - Easylink')->mark('Verarbeitungszeit'),
+				Profiler::getInstance('JT - Easylink (' . $context . ')')->mark('Verarbeitungszeit'),
 				'info'
 			);
 		}
@@ -262,7 +301,7 @@ class PlgContentJteasylink extends JPlugin
 	 */
 	private function getPlgCalls($text)
 	{
-		$regex = '@(<(\w*+)[^>]*>|){jteasylink([\s,].*)?}(</\\2>|)@siU';
+		$regex = '@(<(\w*+)[^>]*>)\s?{jteasylink([^}].*)?}.*(</\2>)|{jteasylink([^}]?.*)?}@iU';
 		$p1    = preg_match_all($regex, $text, $matches);
 
 		if ($p1)
@@ -290,7 +329,18 @@ class PlgContentJteasylink extends JPlugin
 
 			foreach ($matches[0] as $key => $value)
 			{
-				$params = empty($matches[3][$key]) ? 'dse' : $matches[3][$key];
+				$params = 'dse';
+
+				if (!empty($matches[3][$key]))
+				{
+					$params = trim($matches[3][$key]);
+				}
+
+				if (empty($matches[3][$key]) && !empty($matches[5][$key]))
+				{
+					$params = trim($matches[5][$key]);
+				}
+
 				$options[$key] = explode(',', $params);
 
 				if (empty($options[$key][0]))
@@ -311,7 +361,7 @@ class PlgContentJteasylink extends JPlugin
 	/**
 	 * Check to see if the cache file is up to date
 	 *
-	 * @param   string  $file       Filename with absolute path
+	 * @param   string  $file       Cachefile with absolute path
 	 * @param   int     $cacheTime  Cachetime setup in params
 	 *
 	 * @return   bool  true if cached file is up to date
@@ -335,10 +385,10 @@ class PlgContentJteasylink extends JPlugin
 	/**
 	 * Load HTML file from Server or get cached file
 	 *
-	 * @param   string  $cacheFile         Filename with absolute path
+	 * @param   string  $cacheFile         Cachefile with absolute path
 	 * @param   string  $easylawServerUrl  EasyLaw Server-URL for API-Call
 	 *
-	 * @return   bool  true if buffer is set
+	 * @return   string
 	 * @since    1.0.0
 	 */
 	private function getHtml($cacheFile, $easylawServerUrl)
@@ -357,40 +407,25 @@ class PlgContentJteasylink extends JPlugin
 				$html .= $matches[1];
 				$html .= '</' . $cTag . '>';
 
-				if (!empty($html))
-				{
-					$this->setBuffer($cacheFile, $html);
-
-					return $html;
-				}
+				return $html;
 			}
 		}
 
-		$fileName     = basename($cacheFile);
-		$documentCall = File::stripExt($fileName);
-		$documentCall = Text::_($this->documentCalls[$documentCall]);
+		$this->setErrorMessage($cacheFile, (int) $data->code, array($data->body));
 
-		$this->message['error'][] = Text::sprintf(
-			'PLG_CONTENT_JTEASYLINK_ERROR_NO_CACHE_SERVER',
-			$documentCall,
-			$data->code,
-			'<br />' . $data->body
-		);
-
-		return $this->getBuffer($cacheFile);
+		return '';
 	}
 
 	/**
 	 * Load JSON file from Server or get cached file
 	 *
-	 * @param   string  $cacheFile         Filename with absolute path
+	 * @param   string  $cacheFile         Cachefile with absolute path
 	 * @param   string  $easylawServerUrl  EasyLaw Server-URL for API-Call
-	 * @param   string  $language          Language shortcode (de, en)
 	 *
 	 * @return   string
 	 * @since    1.0.0
 	 */
-	private function getJson($cacheFile, $easylawServerUrl, $language)
+	private function getJson($cacheFile, $easylawServerUrl)
 	{
 		$error   = false;
 		$message = [];
@@ -419,35 +454,52 @@ class PlgContentJteasylink extends JPlugin
 
 		if ($error === false)
 		{
+//			file_put_contents($cacheFile . '.json', $data->body);
+
 			$cTag = $this->params->get('ctag', 'section');
 			$html = '<' . $cTag . ' class="jteasylink">';
 			$html .= $this->formatRules($result->rules);
 			$html .= '</' . $cTag . '>';
 
-			if (!empty($html))
-			{
-				$this->setBuffer($cacheFile, $html);
+			$search  = array(
+				"\r\n \r\n",
+				"\r\n\r\n",
+				"\r\n <ul",
+				"\r\n<ul",
+				"\r\n    <li>",
+				"\r\n </ul>",
+				"\r\n<li>",
+				"\r\n</ul>",
+				"<p>\r\n",
+				"<p><div",
+				"</div></p>",
+				"<p></p>",
+				"<br /><br />",
+			);
+			$replace = array(
+				'</p><p>',
+				'</p><p>',
+				'</p><ul',
+				'</p><ul',
+				'<li>',
+				'</ul><p>',
+				'<li>',
+				'</ul><p>',
+				'<p>',
+				'<div',
+				'</div>',
+				'',
+			);
 
-				return $html;
-			}
+			$ruleContent = str_replace($search, $replace, $html);
+			$html = nl2br($ruleContent);
+
+			return $html;
 		}
 
-		$fileName     = basename($cacheFile);
-		$documentCall = File::stripExt($fileName);
+		$this->setErrorMessage($cacheFile, (int) $data->code, $message);
 
-		if (!empty($this->documentCalls[$documentCall]))
-		{
-			$documentCall = Text::_($this->documentCalls[$documentCall]);
-		}
-
-		$this->message['error'][] = Text::sprintf(
-			'PLG_CONTENT_JTEASYLINK_ERROR_NO_CACHE_SERVER',
-			$documentCall,
-			$data->code,
-			implode('<br />', $message)
-		);
-
-		return $this->getBuffer($cacheFile);
+		return '';
 	}
 
 	/**
@@ -461,7 +513,7 @@ class PlgContentJteasylink extends JPlugin
 	private function formatRules(array $rules)
 	{
 		$html      = '';
-		$hTag      = (int) $this->params->get('htag', '1');
+		$_hTag     = (int) $this->params->get('htag', '1');
 		$container = $this->params->get('ctag', 'section');
 
 		foreach ($rules as $rule)
@@ -469,7 +521,7 @@ class PlgContentJteasylink extends JPlugin
 			$cTag  = ($rule->level > 2) ? 'div' : $container;
 			$level = (int) $rule->level - 1;
 			$level = ($level < 1) ? 1 : $level;
-			$hTag  = $hTag + (int) $rule->level - 2;
+			$hTag  = $_hTag + (int) $rule->level - 2;
 			$hTag  = ($hTag < 1) ? 1 : $hTag;
 			$hTag  = ($hTag > 6) ? 6 : $hTag;
 
@@ -483,13 +535,7 @@ class PlgContentJteasylink extends JPlugin
 					. '</h' . $hTag . '>';
 			}
 
-			if (!empty($rule->content))
-			{
-				$ruleContent = nl2br($rule->content);
-				$ruleContent = str_replace('<img src="https://easyrechtssicher.de/api/images/link.png"', '<img src="https://easyrechtssicher.de/api/images/link.png" class="noresize" ', $ruleContent);
-
-				$html .= '<p>' . $ruleContent . '</p>';
-			}
+			$html .= '<p>' . $rule->content . '</p>';
 
 			if (!empty($rule->rules) && is_array($rule->rules))
 			{
@@ -510,7 +556,7 @@ class PlgContentJteasylink extends JPlugin
 	 * @return   string
 	 * @since    1.0.0
 	 */
-	private function getBuffer($cacheFile)
+	private function getCache($cacheFile)
 	{
 		if (file_exists($cacheFile))
 		{
@@ -523,15 +569,43 @@ class PlgContentJteasylink extends JPlugin
 	/**
 	 * Write content to cache file
 	 *
-	 * @param   string  $cacheFile  Path to cachef ile
+	 * @param   string  $cacheFile  Cachefile with absolute path
 	 * @param   string  $html       Content to write to cache file
 	 *
 	 * @return   void
 	 * @since    1.0.0
 	 */
-	private function setBuffer($cacheFile, $html)
+	private function setCache($cacheFile, $html)
 	{
 		JFile::delete($cacheFile);
 		JFile::write($cacheFile, $html);
+	}
+
+	/**
+	 * Set message to error buffer
+	 *
+	 * @param   string  $cacheFile   Cachefile with absolute path
+	 * @param   int     $statusCode  Response status code
+	 * @param   array   $message     Error message
+	 *
+	 * @return   void
+	 * @since    1.0.0
+	 */
+	private function setErrorMessage($cacheFile, $statusCode, array $message)
+	{
+		$fileName     = basename($cacheFile);
+		$documentCall = File::stripExt($fileName);
+
+		if (!empty($this->documentCalls[$documentCall]))
+		{
+			$documentCall = Text::_($this->documentCalls[$documentCall]);
+		}
+
+		$this->message['error'][] = Text::sprintf(
+			'PLG_CONTENT_JTEASYLINK_ERROR_NO_CACHE_SERVER',
+			$documentCall,
+			$statusCode,
+			implode('<br />', $message)
+		);
 	}
 }
