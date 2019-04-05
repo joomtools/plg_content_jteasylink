@@ -26,7 +26,7 @@ class PlgContentJteasylinkInstallerScript
 	{
 		// Define the minumum versions to be supported.
 		$this->minimumJoomla = '3.9';
-		$this->minimumPhp    = '7.1';
+		$this->minimumPhp    = '5.6';
 	}
 
 	/**

@@ -75,8 +75,8 @@ class PlgContentJteasylink extends JPlugin
 	 */
 	private $documentCalls = [
 		'dse' => 'PLG_CONTENT_JTEASYLINK_CALL_DSE_LABEL',
-		//'imp' => 'PLG_CONTENT_JTEASYLINK_CALL_IMP_LABEL',
-		//'agb' => 'PLG_CONTENT_JTEASYLINK_CALL_AGB_LABEL',
+		'imp' => 'PLG_CONTENT_JTEASYLINK_CALL_IMP_LABEL',
+		'agb' => 'PLG_CONTENT_JTEASYLINK_CALL_AGB_LABEL',
 	];
 
 	/**
@@ -128,7 +128,6 @@ class PlgContentJteasylink extends JPlugin
 		$activeLang  = strtolower(substr(Factory::getLanguage()->getTag(), 0, 2));
 		$language    = in_array($activeLang, $this->supportedLangguages) ? $activeLang : $defaultLang;
 		$domain      = Uri::getInstance()->getHost();
-		$domain      = 'degobbis.de';
 
 		if (empty($apiKey))
 		{
@@ -214,14 +213,6 @@ class PlgContentJteasylink extends JPlugin
 
 			if($useCacheFile === false)
 			{
-				// Alte URL
-				//$easylawServerUrl = 'https://easyrechtssicher.de/api/download/'
-				//. $callType . '/'
-				//. $apiKey . '/'
-				//. $language . '/'
-				//. $domain . '.'
-				//. $methode;
-
 				$easylawServerUrl = 'https://er' . $callType . '.net/'
 					. $apiKey . '/'
 					. $language . '/'
