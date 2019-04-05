@@ -1,18 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <updates>
 	<update>
-		<name>JT - EasyLaw</name>
+		<name>JT - Easylink</name>
 		<description></description>
-		<element>jteasylaw</element>
+		<element>jteasylink</element>
 		<type>plugin</type>
 		<folder>content</folder>
 		<client>site</client>
-		<version>1.0.1</version>
+		<version>1.0.0</version>
 		<downloads>
-			<downloadurl type="full" format="zip">https://github.com/JoomTools/plg_content_jteasylaw/releases/download/1.0.1/plg_content_jteasylaw-1.0.1</downloadurl>
+			<downloadurl type="full" format="zip">https://github.com/JoomTools/plg_content_jteasylink/releases/download/1.0.0/plg_content_jteasylink-1.0.0</downloadurl>
 		</downloads>
 		<maintainer>Guido De Gobbis</maintainer>
-		<php_minimum>7.1</php_minimum>
-		<targetplatform name="joomla" version="3.[9]"/>
+		<php_minimum>5.6</php_minimum>
+		<targetplatform name="joomla" version="3.9"/>
 	</update>
 </updates>

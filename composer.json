@@ -1,9 +1,9 @@
 {
-  "name"       : "JoomTools/plg_content_jteasylink",
+  "name"       : "joomtools/plg_content_jteasylink",
   "description": "Insert and cache law information from easyrechtssicher.de",
   "license"    : "GPL-3+",
   "require"    : {
-    "php": ">=7.1"
+    "php": ">=5.6"
   },
   "repositories": [
     {
