@@ -17,6 +17,8 @@ use Joomla\CMS\Filesystem\Folder;
 use Joomla\CMS\Language\Text;
 use Joomla\CMS\Profiler\Profiler;
 use Joomla\CMS\Uri\Uri;
+use Joomla\Registry\Registry;
+use Joomla\CMS\Http\HttpFactory;
 
 /**
  * Class plgContentJteasylink
@@ -78,6 +80,16 @@ class PlgContentJteasylink extends JPlugin
 		'imp' => 'PLG_CONTENT_JTEASYLINK_CALL_IMP_LABEL',
 		'agb' => 'PLG_CONTENT_JTEASYLINK_CALL_AGB_LABEL',
 	];
+	/**
+	 * Options for HttpFactory request
+	 *
+	 * @var     array
+	 * @since   1.0.1
+	 */
+	private $options = [
+		'userAgent' => 'JT-Easylink Joomla Plugin!',
+	];
+
 
 	/**
 	 * onContentPrepare
@@ -384,8 +396,9 @@ class PlgContentJteasylink extends JPlugin
 	 */
 	private function getHtml($cacheFile, $easylawServerUrl)
 	{
-		$http = JHttpFactory::getHttp();
-		$data = $http->get($easylawServerUrl);
+		$options = new Registry($this->options);
+		$http    = HttpFactory::getHttp($options);
+		$data    = $http->get($easylawServerUrl);
 
 		if ($data->code >= 200 && $data->code < 400)
 		{
@@ -420,10 +433,10 @@ class PlgContentJteasylink extends JPlugin
 	{
 		$error   = false;
 		$message = [];
-
-		$http   = JHttpFactory::getHttp();
-		$data   = $http->get($easylawServerUrl);
-		$result = json_decode($data->body);
+		$options = new Registry($this->options);
+		$http    = HttpFactory::getHttp($options);
+		$data    = $http->get($easylawServerUrl);
+		$result  = json_decode($data->body);
 
 		if ($result === null)
 		{
