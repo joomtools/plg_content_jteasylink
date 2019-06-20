@@ -19,6 +19,7 @@ use Joomla\CMS\Profiler\Profiler;
 use Joomla\CMS\Uri\Uri;
 use Joomla\Registry\Registry;
 use Joomla\CMS\Http\HttpFactory;
+use Joomla\CMS\HTML\HTMLHelper;
 
 /**
  * Class plgContentJteasylink
@@ -120,6 +121,11 @@ class PlgContentJteasylink extends JPlugin
 		if ($debug)
 		{
 			Profiler::getInstance('JT - Easylink (' . $context . ')')->setStart($startTime);
+
+			$this->app->enqueueMessage(
+				Text::_('PLG_CONTENT_JTEASYLINK_WARNING_DEBUG_IS_ON'),
+				'warning'
+			);
 		}
 
 		$useCss = filter_var(
@@ -183,9 +189,6 @@ class PlgContentJteasylink extends JPlugin
 
 		foreach ($plgCalls[0] as $key => $plgCall)
 		{
-			// Pause prevent DB#1062 Duplicate entry database error (primary key)
-			sleep(1);
-
 			$callType = trim(strtolower($plgCalls[1][$key][0]));
 			$fileName = $callType . '.html';
 
@@ -223,8 +226,16 @@ class PlgContentJteasylink extends JPlugin
 				$useCacheFile = $this->getFileTime($cacheFile, $cacheTime);
 			}
 
+			if ($debug)
+			{
+				$useCacheFile = false;
+			}
+
 			if($useCacheFile === false)
 			{
+				// Pause prevent DB#1062 Duplicate entry database error (primary key)
+				sleep(1);
+
 				$easylawServerUrl = 'https://er' . $callType . '.net/'
 					. $apiKey . '/'
 					. $language . '/'
@@ -240,18 +251,10 @@ class PlgContentJteasylink extends JPlugin
 					$buffer = $this->getJson($cacheFile, $easylawServerUrl);
 				}
 
-				if (!empty($buffer))
+				if (!empty($buffer) && $debug === false)
 				{
 					$this->setCache($cacheFile, $buffer);
 				}
-				else
-				{
-					if ($cacheOnOff === true)
-					{
-						$buffer = $this->getCache($cacheFile);
-					}
-				}
-
 			}
 			else
 			{
@@ -261,15 +264,12 @@ class PlgContentJteasylink extends JPlugin
 			$article->text = str_replace($plgCall, $buffer, $article->text);
 		}
 
-		if ($methode == 'json' && $useCss && !self::$cssSet)
+		if ($methode == 'json' && $useCss && self::$cssSet === false)
 		{
-			$css = $this->params->get('css');
-
-			Factory::getDocument()->addStyleDeclaration($css);
+			HTMLHelper::_('stylesheet', 'plg_content_jteasylink/jteasylink.min.css', array('version' => 'auto', 'relative' => true));
 
 			self::$cssSet = true;
 		}
-
 
 		if ($debug)
 		{
@@ -493,6 +493,7 @@ class PlgContentJteasylink extends JPlugin
 				'<div',
 				'</div>',
 				'',
+				'</p><p>',
 			);
 
 			$ruleContent = str_replace($search, $replace, $html);

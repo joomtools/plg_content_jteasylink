@@ -1,128 +1,122 @@
 <?xml version="1.0" encoding="utf-8"?>
 <extension version="3.9" type="plugin" group="content" method="upgrade">
-    <name>PLG_CONTENT_JTEASYLINK</name>
-    <creationDate>##DATE##</creationDate>
-    <author>Guido De Gobbis</author>
-    <authorEmail>support@joomtools.de</authorEmail>
-    <authorUrl>www.joomtools.de</authorUrl>
-    <copyright>Copyright ##YEAR## JoomTools.de. All rights reserved.</copyright>
-    <license>GPL v3</license>
-    <version>##VERSION##</version>
-    <description>PLG_CONTENT_JTEASYLINK_DESC,##VERSION##</description>
+	<name>PLG_CONTENT_JTEASYLINK</name>
+	<creationDate>##DATE##</creationDate>
+	<author>Guido De Gobbis</author>
+	<authorEmail>support@joomtools.de</authorEmail>
+	<authorUrl>www.joomtools.de</authorUrl>
+	<copyright>Copyright ##YEAR## JoomTools.de. All rights reserved.</copyright>
+	<license>GPL v3</license>
+	<version>##VERSION##</version>
+	<description>PLG_CONTENT_JTEASYLINK_DESC,##VERSION##</description>
+	<files>
+		##FILES##
+	</files>
+	<media destination="plg_content_jteasylink" folder="media/plg_content_jteasylink">
+		##MEDIA_FILES##
+	</media>
+	<scriptfile>script.php</scriptfile>
+	<config>
+		<fields name="params">
 
-    <files>
-        ##FILES##
-    </files>
+			<fieldset name="basic">
+				<field name="apikey"
+				       type="text"
+				       default=""
+				       filter="alnum"
+				       label="PLG_CONTENT_JTEASYLINK_APIKEY_LABEL"
+				       description="PLG_CONTENT_JTEASYLINK_APIKEY_DESC"
+				/>
+				<field name="language"
+				       type="list"
+				       default="de"
+				       label="PLG_CONTENT_JTEASYLINK_LANGUAGE_LABEL"
+				       description="PLG_CONTENT_JTEASYLINK_LANGUAGE_DESC"
+				>
+					<option value="de">PLG_CONTENT_JTEASYLINK_LANGUAGE_DE</option>
+					<option value="en">PLG_CONTENT_JTEASYLINK_LANGUAGE_EN</option>
+				</field>
+				<field name="cache"
+				       type="radio"
+				       class="btn-group btn-group-yesno"
+				       default="1"
+				       label="PLG_CONTENT_JTEASYLINK_CACHE_LABEL"
+				       description="PLG_CONTENT_JTEASYLINK_CACHE_DESC">
+					<option value="0">JOFF</option>
+					<option value="1">JON</option>
+				</field>
+				<field name="cachetime"
+				       type="text"
+				       default="1440"
+				       label="PLG_CONTENT_JTEASYLINK_CACHETIME_LABEL"
+				       description="PLG_CONTENT_JTEASYLINK_CACHETIME_DESC"
+				       filter="int"
+				       showon="cache:1"
+				/>
 
-    <scriptfile>script.php</scriptfile>
+				<field name="spacer1" type="spacer" hr="true"/>
 
-    <config>
-        <fields name="params">
+				<field name="methode"
+				       type="radio"
+				       class="btn-group btn-group-yesno"
+				       default="html"
+				       label="PLG_CONTENT_JTEASYLINK_METHODE_LABEL"
+				       description="PLG_CONTENT_JTEASYLINK_METHODE_DESC"
+				>
+					<option value="html">JNO</option>
+					<option value="json">JYES</option>
+				</field>
+				<field name="htag"
+				       type="list"
+				       default="1"
+				       label="PLG_CONTENT_JTEASYLINK_HTAG_LABEL"
+				       description="PLG_CONTENT_JTEASYLINK_HTAG_DESC"
+				       filter="int"
+				       showon="methode:json"
+				>
+					<option value="1">H1</option>
+					<option value="2">H2</option>
+					<option value="3">H3</option>
+				</field>
+				<field name="ctag"
+				       type="list"
+				       default="section"
+				       label="PLG_CONTENT_JTEASYLINK_CTAG_LABEL"
+				       description="PLG_CONTENT_JTEASYLINK_CTAG_DESC"
+				       showon="methode:json"
+				>
+					<option value="section">Section</option>
+					<option value="article">Article</option>
+					<option value="div">Div</option>
+				</field>
+				<field name="usecss"
+				       type="radio"
+				       class="btn-group btn-group-yesno"
+				       default="1"
+				       label="PLG_CONTENT_JTEASYLINK_USECSS_LABEL"
+				       description="PLG_CONTENT_JTEASYLINK_USECSS_DESC"
+				       filter="int"
+				       showon="methode:json"
+				>
+					<option value="0">JNO</option>
+					<option value="1">JYES</option>
+				</field>
+				<field name="debug"
+				       type="radio"
+				       class="btn-group btn-group-yesno"
+				       default="0"
+				       label="PLG_CONTENT_JTEASYLINK_DEBUG_LABEL"
+				       description="PLG_CONTENT_JTEASYLINK_DEBUG_DESC">
+					<option value="1">JOFF</option>
+					<option value="0">JON</option>
+				</field>
+			</fieldset>
 
-            <fieldset name="basic">
-                <field name="apikey"
-                       type="text"
-                       default=""
-                       filter="alnum"
-                       label="PLG_CONTENT_JTEASYLINK_APIKEY_LABEL"
-                       description="PLG_CONTENT_JTEASYLINK_APIKEY_DESC"
-                />
-                <field name="language"
-                       type="list"
-                       default="de"
-                       label="PLG_CONTENT_JTEASYLINK_LANGUAGE_LABEL"
-                       description="PLG_CONTENT_JTEASYLINK_LANGUAGE_DESC"
-                >
-                    <option value="de">PLG_CONTENT_JTEASYLINK_LANGUAGE_DE</option>
-                    <option value="en">PLG_CONTENT_JTEASYLINK_LANGUAGE_EN</option>
-                </field>
-                <field name="cache"
-                       type="radio"
-                       class="btn-group btn-group-yesno"
-                       default="1"
-                       label="PLG_CONTENT_JTEASYLINK_CACHE_LABEL"
-                       description="PLG_CONTENT_JTEASYLINK_CACHE_DESC">
-                    <option value="0">JOFF</option>
-                    <option value="1">JON</option>
-                </field>
-                <field name="cachetime"
-                       type="text"
-                       default="1440"
-                       label="PLG_CONTENT_JTEASYLINK_CACHETIME_LABEL"
-                       description="PLG_CONTENT_JTEASYLINK_CACHETIME_DESC"
-                       filter="int"
-                       showon="cache:1"
-                />
-
-                <field name="spacer1" type="spacer" hr="true" />
-
-                <field name="methode"
-                       type="radio"
-                       class="btn-group btn-group-yesno"
-                       default="html"
-                       label="PLG_CONTENT_JTEASYLINK_METHODE_LABEL"
-                       description="PLG_CONTENT_JTEASYLINK_METHODE_DESC"
-                >
-                    <option value="html">JNO</option>
-                    <option value="json">JYES</option>
-                </field>
-                <field name="htag"
-                       type="list"
-                       default="1"
-                       label="PLG_CONTENT_JTEASYLINK_HTAG_LABEL"
-                       description="PLG_CONTENT_JTEASYLINK_HTAG_DESC"
-                       filter="int"
-                       showon="methode:json"
-                >
-                    <option value="1">H1</option>
-                    <option value="2">H2</option>
-                    <option value="3">H3</option>
-                </field>
-                <field name="ctag"
-                       type="list"
-                       default="section"
-                       label="PLG_CONTENT_JTEASYLINK_CTAG_LABEL"
-                       description="PLG_CONTENT_JTEASYLINK_CTAG_DESC"
-                       showon="methode:json"
-                >
-                    <option value="section">Section</option>
-                    <option value="article">Article</option>
-                    <option value="div">Div</option>
-                </field>
-                <field name="usecss"
-                       type="radio"
-                       class="btn-group btn-group-yesno"
-                       default="1"
-                       label="PLG_CONTENT_JTEASYLINK_USECSS_LABEL"
-                       description="PLG_CONTENT_JTEASYLINK_USECSS_DESC"
-                       filter="int"
-                       showon="methode:json"
-                >
-                    <option value="0">JNO</option>
-                    <option value="1">JYES</option>
-                </field>
-                <field name="css"
-                       type="textarea"
-                       rows="10"
-                       default=".jteasylink .level1 {&#xD;&#xA;&#09;margin-top: 40px;&#xD;&#xA;}&#xD;&#xA;.jteasylink .level2,&#xD;&#xA;.jteasylink .level3,&#xD;&#xA;.jteasylink .level4 {&#xD;&#xA;&#09;margin: 20px 0 0 20px;&#xD;&#xA;}"
-                       label="PLG_CONTENT_JTEASYLINK_CSS_LABEL"
-                       description="PLG_CONTENT_JTEASYLINK_CSS_DESC"
-                       showon="methode:json[AND]usecss:1"
-                />
-                <field name="debug"
-                       type="radio"
-                       class="btn-group btn-group-yesno"
-                       default="0"
-                       label="PLG_CONTENT_JTEASYLINK_DEBUG_LABEL"
-                       description="PLG_CONTENT_JTEASYLINK_DEBUG_DESC">
-                    <option value="1">JOFF</option>
-                    <option value="0">JON</option>
-                </field>
-            </fieldset>
-
-        </fields>
-    </config>
-    <updateservers>
-        <server type="extension" priority="1" name="PLG_CONTENT_JTEASYLINK">https://raw.githubusercontent.com/JoomTools/plg_content_jteasylink/master/update.xml</server>
-    </updateservers>
+		</fields>
+	</config>
+	<updateservers>
+		<server type="extension" priority="1" name="PLG_CONTENT_JTEASYLINK">
+			https://raw.githubusercontent.com/JoomTools/plg_content_jteasylink/master/update.xml
+		</server>
+	</updateservers>
 </extension>
