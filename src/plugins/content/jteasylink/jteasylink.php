@@ -14,12 +14,13 @@ defined('_JEXEC') or die;
 use Joomla\CMS\Factory;
 use Joomla\CMS\Filesystem\File;
 use Joomla\CMS\Filesystem\Folder;
+use Joomla\CMS\HTML\HTMLHelper;
+use Joomla\CMS\Http\HttpFactory;
 use Joomla\CMS\Language\Text;
+use Joomla\CMS\Layout\FileLayout;
 use Joomla\CMS\Profiler\Profiler;
 use Joomla\CMS\Uri\Uri;
 use Joomla\Registry\Registry;
-use Joomla\CMS\Http\HttpFactory;
-use Joomla\CMS\HTML\HTMLHelper;
 
 /**
  * Class plgContentJteasylink
@@ -116,7 +117,25 @@ class PlgContentJteasylink extends JPlugin
 		// Set starttime for process total time
 		$startTime = microtime(1);
 
-		$debug = $this->params->get('debug', 0) == '0' ? true : false;
+		$debug  = $this->params->get('debug', 0) == '0' ? true : false;
+		$useCss = filter_var(
+			$this->params->get('usecss', 1),
+			FILTER_VALIDATE_BOOLEAN
+		);
+
+		$cacheOnOff = filter_var(
+			$this->params->get('cache', 1),
+			FILTER_VALIDATE_BOOLEAN
+		);
+
+		$cachePath   = JPATH_CACHE . '/plg_content_jteasylink';
+		$cacheTime   = (int) $this->params->get('cachetime', 60) * 60;
+		$methode     = $this->params->get('methode', 'html');
+		$apiKey      = trim($this->params->get('apikey', ''));
+		$defaultLang = $this->params->get('language', 'de');
+		$activeLang  = strtolower(substr(Factory::getLanguage()->getTag(), 0, 2));
+		$language    = in_array($activeLang, $this->supportedLangguages) ? $activeLang : $defaultLang;
+		$domain      = Uri::getInstance()->getHost();
 
 		if ($debug)
 		{
@@ -127,25 +146,6 @@ class PlgContentJteasylink extends JPlugin
 				'warning'
 			);
 		}
-
-		$useCss = filter_var(
-			$this->params->get('usecss', 1),
-			FILTER_VALIDATE_BOOLEAN
-		);
-
-		$cachePath  = JPATH_CACHE . '/plg_content_jteasylink';
-		$cacheTime  = (int) $this->params->get('cachetime', 60) * 60;
-		$cacheOnOff = filter_var(
-			$this->params->get('cache', 1),
-			FILTER_VALIDATE_BOOLEAN
-		);
-
-		$methode     = $this->params->get('methode', 'html');
-		$apiKey      = trim($this->params->get('apikey', ''));
-		$defaultLang = $this->params->get('language', 'de');
-		$activeLang  = strtolower(substr(Factory::getLanguage()->getTag(), 0, 2));
-		$language    = in_array($activeLang, $this->supportedLangguages) ? $activeLang : $defaultLang;
-		$domain      = Uri::getInstance()->getHost();
 
 		if (empty($apiKey))
 		{
@@ -189,13 +189,23 @@ class PlgContentJteasylink extends JPlugin
 
 		foreach ($plgCalls[0] as $key => $plgCall)
 		{
-			$callType = trim(strtolower($plgCalls[1][$key][0]));
-			$fileName = $callType . '.html';
+			$skiplinks = false;
+			$fileName = '';
+
+			if (trim($plgCalls[1][$key][0]) == 'skiplinks')
+			{
+				$skiplinks = true;
+				$fileName = 'skiplinks_';
+				array_shift($plgCalls[1][$key]);
+			}
+
+			$callType = trim($plgCalls[1][$key][0]);
+			$fileName .= $callType . '.html';
 
 			if (!empty($plgCalls[1][$key][1]))
 			{
 				// Get preferred language from plugin call
-				$callLang = trim(strtolower($plgCalls[1][$key][1]));
+				$callLang = trim($plgCalls[1][$key][1]);
 
 				// Validate if language is supported
 				$supportedLangguages = in_array($callLang, $this->supportedLangguages) ? true : false;
@@ -248,7 +258,7 @@ class PlgContentJteasylink extends JPlugin
 				}
 				else
 				{
-					$buffer = $this->getJson($cacheFile, $easylawServerUrl);
+					$buffer = $this->getJson($cacheFile, $easylawServerUrl, $skiplinks);
 				}
 
 				if (!empty($buffer) && $debug === false)
@@ -336,12 +346,12 @@ class PlgContentJteasylink extends JPlugin
 
 				if (!empty($matches[3][$key]))
 				{
-					$params = trim($matches[3][$key]);
+					$params = trim(strtolower($matches[3][$key]));
 				}
 
 				if (empty($matches[3][$key]) && !empty($matches[5][$key]))
 				{
-					$params = trim($matches[5][$key]);
+					$params = trim(strtolower($matches[5][$key]));
 				}
 
 				$options[$key] = explode(',', $params);
@@ -349,6 +359,11 @@ class PlgContentJteasylink extends JPlugin
 				if (empty($options[$key][0]))
 				{
 					$options[$key][0] = 'dse';
+				}
+
+				if (empty($options[$key][1]) && $options[$key][0] == 'skiplinks')
+				{
+					$options[$key][1] = 'dse';
 				}
 			}
 
@@ -388,17 +403,17 @@ class PlgContentJteasylink extends JPlugin
 	/**
 	 * Load HTML file from Server or get cached file
 	 *
-	 * @param   string  $cacheFile         Cachefile with absolute path
-	 * @param   string  $easylawServerUrl  EasyLaw Server-URL for API-Call
+	 * @param   string  $cacheFile          Cachefile with absolute path
+	 * @param   string  $easylinkServerUrl  EasyLaw Server-URL for API-Call
 	 *
 	 * @return   string
 	 * @since    1.0.0
 	 */
-	private function getHtml($cacheFile, $easylawServerUrl)
+	private function getHtml($cacheFile, $easylinkServerUrl)
 	{
 		$options = new Registry($this->options);
 		$http    = HttpFactory::getHttp($options);
-		$data    = $http->get($easylawServerUrl);
+		$data    = $http->get($easylinkServerUrl);
 
 		if ($data->code >= 200 && $data->code < 400)
 		{
@@ -423,19 +438,20 @@ class PlgContentJteasylink extends JPlugin
 	/**
 	 * Load JSON file from Server or get cached file
 	 *
-	 * @param   string  $cacheFile         Cachefile with absolute path
-	 * @param   string  $easylawServerUrl  EasyLaw Server-URL for API-Call
+	 * @param   string  $cacheFile          Cachefile with absolute path
+	 * @param   string  $easylinkServerUrl  EasyLaw Server-URL for API-Call
+	 * @param   bool    $skiplinks
 	 *
 	 * @return   string
 	 * @since    1.0.0
 	 */
-	private function getJson($cacheFile, $easylawServerUrl)
+	private function getJson($cacheFile, $easylinkServerUrl, $skiplinks = false)
 	{
 		$error   = false;
 		$message = [];
 		$options = new Registry($this->options);
 		$http    = HttpFactory::getHttp($options);
-		$data    = $http->get($easylawServerUrl);
+		$data    = $http->get($easylinkServerUrl);
 		$result  = json_decode($data->body);
 
 		if ($result === null)
@@ -458,48 +474,12 @@ class PlgContentJteasylink extends JPlugin
 
 		if ($error === false)
 		{
-//			file_put_contents($cacheFile . '.json', $data->body);
+			if ($skiplinks)
+			{
+				return $this->createSkiplinksContent($result);
+			}
 
-			$cTag = $this->params->get('ctag', 'section');
-			$html = '<' . $cTag . ' class="jteasylink">';
-			$html .= $this->formatRules($result->rules);
-			$html .= '</' . $cTag . '>';
-
-			$search  = array(
-				"\r\n \r\n",
-				"\r\n\r\n",
-				"\r\n <ul",
-				"\r\n<ul",
-				"\r\n    <li>",
-				"\r\n </ul>",
-				"\r\n<li>",
-				"\r\n</ul>",
-				"<p>\r\n",
-				"<p><div",
-				"</div></p>",
-				"<p></p>",
-				"<br /><br />",
-			);
-			$replace = array(
-				'</p><p>',
-				'</p><p>',
-				'</p><ul',
-				'</p><ul',
-				'<li>',
-				'</ul><p>',
-				'<li>',
-				'</ul><p>',
-				'<p>',
-				'<div',
-				'</div>',
-				'',
-				'</p><p>',
-			);
-
-			$ruleContent = str_replace($search, $replace, $html);
-			$html = nl2br($ruleContent);
-
-			return $html;
+			return $this->createJsonContent($result);
 		}
 
 		$this->setErrorMessage($cacheFile, (int) $data->code, $message);
@@ -510,27 +490,28 @@ class PlgContentJteasylink extends JPlugin
 	/**
 	 * Create HTML from rules
 	 *
-	 * @param   array  $rules  Array of rules from $this->getJason()
+	 * @param   string  $type       Type of call
+	 * @param   array   $rules      Array of rules
+	 * @param   int     $header     Header-Tag numner
+	 * @param   string  $container  Container-Tag
 	 *
 	 * @return   string
 	 * @since    1.0.0
 	 */
-	private function formatRules(array $rules)
+	public function formatRules($type, $rules, $header, $container)
 	{
-		$html      = '';
-		$_hTag     = (int) $this->params->get('htag', '1');
-		$container = $this->params->get('ctag', 'section');
+		$html = '';
 
 		foreach ($rules as $rule)
 		{
 			$cTag  = ($rule->level > 2) ? 'div' : $container;
 			$level = (int) $rule->level - 1;
 			$level = ($level < 1) ? 1 : $level;
-			$hTag  = $_hTag + (int) $rule->level - 2;
+			$hTag  = $header + (int) $rule->level - 2;
 			$hTag  = ($hTag < 1) ? 1 : $hTag;
 			$hTag  = ($hTag > 6) ? 6 : $hTag;
 
-			$html .= '<' . $cTag . ' id="' . $rule->name
+			$html .= '<' . $cTag . ' id="' . $type . '_' . $rule->name
 				. '" class="' . $rule->name . ' level' . $level . '">';
 
 			if (!empty($rule->header))
@@ -544,7 +525,7 @@ class PlgContentJteasylink extends JPlugin
 
 			if (!empty($rule->rules) && is_array($rule->rules))
 			{
-				$html .= $this->formatRules($rule->rules);
+				$html .= $this->formatRules($type, $rule->rules, $header, $container);
 			}
 
 			$html .= '</' . $cTag . '>';
@@ -612,5 +593,90 @@ class PlgContentJteasylink extends JPlugin
 			$statusCode,
 			implode('<br />', $message)
 		);
+	}
+
+	/**
+	 * Create content from Json request
+	 *
+	 * @param   object  $json  Request from easyrechtssicher.de
+	 *
+	 * @return   string
+	 * @since    1.0.3
+	 */
+	private function createJsonContent($json)
+	{
+		// file_put_contents($cacheFile . '.json', $data->body);
+
+		$cTag = $this->params->get('ctag', 'section');
+		$htag = (int) $this->params->get('htag', '1');
+		$html = '<' . $cTag . ' class="jteasylink ' . $json->object . '">';
+		$html .= $this->formatRules($json->object, $json->rules, $htag, $cTag);
+		$html .= '</' . $cTag . '>';
+
+		$search  = array(
+			"\r\n \r\n",
+			"\r\n\r\n",
+			"\r\n <ul",
+			"\r\n<ul",
+			"\r\n    <li>",
+			"\r\n </ul>",
+			"\r\n<li>",
+			"\r\n</ul>",
+			"<p>\r\n",
+			"<p><div",
+			"</div></p>",
+			"<p></p>",
+			"<br /><br />",
+		);
+		$replace = array(
+			'</p><p>',
+			'</p><p>',
+			'</p><ul',
+			'</p><ul',
+			'<li>',
+			'</ul><p>',
+			'<li>',
+			'</ul><p>',
+			'<p>',
+			'<div',
+			'</div>',
+			'',
+			'</p><p>',
+		);
+
+		$ruleContent = str_replace($search, $replace, $html);
+		$html        = nl2br($ruleContent);
+
+		return $html;
+	}
+
+	/**
+	 * Create skiplinks from Json request
+	 *
+	 * @param   object  $json  Request from easyrechtssicher.de
+	 *
+	 * @return   string
+	 * @since    1.0.3
+	 * @throws   \Exception
+	 */
+	private function createSkiplinksContent($json)
+	{
+		$theme             = Factory::getApplication()->getTemplate();
+		$themeOverridePath = JPATH_THEMES . '/' . $theme . '/html/plg_' . $this->_type . '_' . $this->_name;
+		$layoutBasePath    = JPATH_PLUGINS . '/' . $this->_type . '/' . $this->_name . '/tmpl';
+
+		$renderer = new FileLayout('skiplinks', $layoutBasePath, array('component' => 'none'));
+		$renderer->addIncludePath($themeOverridePath);
+
+		$displayData = array(
+			'type'      => $json->object,
+			'container' => $this->params->get('skiplinksCtag', 'nav'),
+			'rules'     => $json->rules,
+		);
+
+		$content = $renderer->render($displayData);
+		// file_put_contents($cacheFile . '.json', $data->body);
+
+		return $content;
 	}
 }

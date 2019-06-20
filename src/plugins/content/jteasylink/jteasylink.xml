@@ -89,6 +89,16 @@
 					<option value="article">Article</option>
 					<option value="div">Div</option>
 				</field>
+				<field name="skipCtag"
+				       type="list"
+				       default="nav"
+				       label="PLG_CONTENT_JTEASYLINK_SKIPCTAG_LABEL"
+				       description="PLG_CONTENT_JTEASYLINK_SKIPCTAG_DESC"
+				       showon="methode:json"
+				>
+					<option value="nav">Nav</option>
+					<option value="div">Div</option>
+				</field>
 				<field name="usecss"
 				       type="radio"
 				       class="btn-group btn-group-yesno"
