@@ -36,7 +36,8 @@ class PlgContentJteasylinkInstallerScript
 	 * @param   JInstaller  $installer  The class calling this method
 	 *
 	 * @return   boolean  True on success
-	 * @since   1.0.0
+	 * @since    1.0.0
+	 * @throws   \Exception
 	 */
 	public function preflight($action, $installer)
 	{
@@ -56,6 +57,24 @@ class PlgContentJteasylinkInstallerScript
 
 			return false;
 		}
+
+		return true;
+	}
+
+	/**
+	 * Called after any type of action
+	 *
+	 * @param   string      $action     Which action is happening (install|uninstall|discover_install|update)
+	 * @param   JInstaller  $installer  The class calling this method
+	 *
+	 * @return   boolean  True on success
+	 * @since    1.0.3
+	 */
+	public function postflight($action, $installer)
+	{
+		$cache = JFactory::getCache();
+		$cache->cache->clean('plg_content_jteasylink');
+		$cache->cache->clean('_jteasylink');
 
 		return true;
 	}

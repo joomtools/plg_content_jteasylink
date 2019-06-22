@@ -18,6 +18,8 @@ use Joomla\CMS\HTML\HTMLHelper;
 use Joomla\CMS\Http\HttpFactory;
 use Joomla\CMS\Language\Text;
 use Joomla\CMS\Layout\FileLayout;
+use Joomla\CMS\Plugin\CMSPlugin;
+use Joomla\CMS\Plugin\PluginHelper;
 use Joomla\CMS\Profiler\Profiler;
 use Joomla\CMS\Uri\Uri;
 use Joomla\Registry\Registry;
@@ -31,7 +33,7 @@ use Joomla\Registry\Registry;
  * @subpackage   Content.jteasylink
  * @since        1.0.0
  */
-class PlgContentJteasylink extends JPlugin
+class PlgContentJteasylink extends CMSPlugin
 {
 	/**
 	 * Set css once
@@ -128,7 +130,7 @@ class PlgContentJteasylink extends JPlugin
 			FILTER_VALIDATE_BOOLEAN
 		);
 
-		$cachePath   = JPATH_CACHE . '/plg_content_jteasylink';
+		$cachePath   = JPATH_CACHE . '/_jteasylink';
 		$cacheTime   = (int) $this->params->get('cachetime', 60) * 60;
 		$methode     = $this->params->get('methode', 'html');
 		$apiKey      = trim($this->params->get('apikey', ''));
@@ -224,7 +226,9 @@ class PlgContentJteasylink extends JPlugin
 				}
 			}
 
-			$cacheFile = $cachePath . '/' . $language . '/' . $fileName;
+			$keyName   = $language . '_' . File::stripExt($fileName);
+			$key       = md5(serialize($keyName));
+			$cacheFile = $cachePath . '/' . $key . '-cache-' . $keyName . '.php';
 
 			if (!Folder::exists(dirname($cacheFile)))
 			{
@@ -280,6 +284,8 @@ class PlgContentJteasylink extends JPlugin
 
 			self::$cssSet = true;
 		}
+
+		$this->removeJoomlaCache($context);
 
 		if ($debug)
 		{
@@ -546,7 +552,9 @@ class PlgContentJteasylink extends JPlugin
 	{
 		if (file_exists($cacheFile))
 		{
-			return @file_get_contents($cacheFile);
+			$cache = @file_get_contents($cacheFile);
+
+			return str_replace('<?php die("Access Denied"); ?>', '', $cache);
 		}
 
 		return '';
@@ -564,7 +572,8 @@ class PlgContentJteasylink extends JPlugin
 	private function setCache($cacheFile, $html)
 	{
 		JFile::delete($cacheFile);
-		JFile::write($cacheFile, $html);
+		$cache = '<?php die("Access Denied"); ?>' . $html;
+		JFile::write($cacheFile, $cache);
 	}
 
 	/**
@@ -678,5 +687,52 @@ class PlgContentJteasylink extends JPlugin
 		// file_put_contents($cacheFile . '.json', $data->body);
 
 		return $content;
+	}
+
+	/**
+	 * Remove caching if plugin is called
+	 *
+	 * @param   string  $context
+	 *
+	 * @return   void
+	 * @since    1.0.3
+	 */
+	private function removeJoomlaCache($context)
+	{
+		$cachePagePlugin = PluginHelper::isEnabled('system', 'cache');
+		$cacheIsActive   = Factory::getConfig()->get('caching', 0) != 0
+			? true
+			: false;
+
+		if (!$cacheIsActive && !$cachePagePlugin)
+		{
+			return;
+		}
+
+		$key         = (array) JUri::getInstance()->toString();
+		$key         = md5(serialize($key));
+		$group       = strstr($context, '.', true);
+		$cacheGroups = array();
+
+		if($cacheIsActive)
+		{
+			$cacheGroups = array(
+				$group        => 'callback',
+				'com_modules' => '',
+				'com_content' => 'view',
+			);
+		}
+
+		if($cachePagePlugin)
+		{
+			$cacheGroups['page'] = 'callback';
+		}
+
+		foreach ($cacheGroups as $group => $handler)
+		{
+			$cache = JFactory::getCache($group, $handler);
+			$cache->cache->remove($key);
+			$cache->cache->setCaching(false);
+		}
 	}
 }
