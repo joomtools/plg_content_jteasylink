@@ -83,6 +83,7 @@ class PlgContentJteasylink extends CMSPlugin
 		'dse' => 'PLG_CONTENT_JTEASYLINK_CALL_DSE_LABEL',
 		'imp' => 'PLG_CONTENT_JTEASYLINK_CALL_IMP_LABEL',
 		'agb' => 'PLG_CONTENT_JTEASYLINK_CALL_AGB_LABEL',
+		'wbl' => 'PLG_CONTENT_JTEASYLINK_CALL_WBL_LABEL',
 	];
 	/**
 	 * Options for HttpFactory request
@@ -120,6 +121,12 @@ class PlgContentJteasylink extends CMSPlugin
 		$startTime = microtime(1);
 
 		$debug  = $this->params->get('debug', 0) == '0' ? true : false;
+
+		if (Factory::getConfig()->get('debug', false))
+		{
+			$debug = true;
+		}
+
 		$useCss = filter_var(
 			$this->params->get('usecss', 1),
 			FILTER_VALIDATE_BOOLEAN
@@ -192,16 +199,29 @@ class PlgContentJteasylink extends CMSPlugin
 		foreach ($plgCalls[0] as $key => $plgCall)
 		{
 			$skiplinks = false;
-			$fileName = '';
+			$fileName  = '';
+			$callType  = trim($plgCalls[1][$key][0]);
 
-			if (trim($plgCalls[1][$key][0]) == 'skiplinks')
+			if ($callType == 'skiplinks')
 			{
 				$skiplinks = true;
-				$fileName = 'skiplinks_';
+				$fileName  = 'skiplinks_';
+
 				array_shift($plgCalls[1][$key]);
+
+				$callType = trim($plgCalls[1][$key][0]);
 			}
 
-			$callType = trim($plgCalls[1][$key][0]);
+			if (empty($this->documentCalls[$callType]))
+			{
+				$this->message['error'][] = Text::sprintf(
+					'PLG_CONTENT_JTEASYLINK_ERROR_NO_DOKUMENT_EXISTS',
+					$callType
+				);
+
+				continue;
+			}
+
 			$fileName .= $callType . '.html';
 
 			if (!empty($plgCalls[1][$key][1]))
