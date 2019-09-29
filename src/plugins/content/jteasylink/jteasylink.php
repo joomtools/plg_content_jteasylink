@@ -74,12 +74,24 @@ class PlgContentJteasylink extends CMSPlugin
 	 */
 	private $message = [];
 	/**
-	 * Document calls
+	 * Allowed skiplinks calls
 	 *
 	 * @var     array
 	 * @since   1.0.0
 	 */
-	private $documentCalls = [
+	private $allowedSkiplinksCalls = [
+		'dse' => 'PLG_CONTENT_JTEASYLINK_CALL_DSE_LABEL',
+//		'imp' => 'PLG_CONTENT_JTEASYLINK_CALL_IMP_LABEL',
+//		'agb' => 'PLG_CONTENT_JTEASYLINK_CALL_AGB_LABEL',
+//		'wbl' => 'PLG_CONTENT_JTEASYLINK_CALL_WBL_LABEL',
+	];
+	/**
+	 * Allowed document calls
+	 *
+	 * @var     array
+	 * @since   1.0.0
+	 */
+	private $allowedDocumentCalls = [
 		'dse' => 'PLG_CONTENT_JTEASYLINK_CALL_DSE_LABEL',
 		'imp' => 'PLG_CONTENT_JTEASYLINK_CALL_IMP_LABEL',
 		'agb' => 'PLG_CONTENT_JTEASYLINK_CALL_AGB_LABEL',
@@ -210,9 +222,19 @@ class PlgContentJteasylink extends CMSPlugin
 				array_shift($plgCalls[1][$key]);
 
 				$callType = trim($plgCalls[1][$key][0]);
+
+				if (empty($this->allowedSkiplinksCalls[$callType]))
+				{
+					$this->message['error'][] = Text::sprintf(
+						'PLG_CONTENT_JTEASYLINK_ERROR_NO_DOKUMENT_EXISTS',
+						'skiplinks,' . $callType
+					);
+
+					continue;
+				}
 			}
 
-			if (empty($this->documentCalls[$callType]))
+			if (empty($this->allowedDocumentCalls[$callType]))
 			{
 				$this->message['error'][] = Text::sprintf(
 					'PLG_CONTENT_JTEASYLINK_ERROR_NO_DOKUMENT_EXISTS',
@@ -611,9 +633,9 @@ class PlgContentJteasylink extends CMSPlugin
 		$fileName     = basename($cacheFile);
 		$documentCall = File::stripExt($fileName);
 
-		if (!empty($this->documentCalls[$documentCall]))
+		if (!empty($this->allowedDocumentCalls[$documentCall]))
 		{
-			$documentCall = Text::_($this->documentCalls[$documentCall]);
+			$documentCall = Text::_($this->allowedDocumentCalls[$documentCall]);
 		}
 
 		$this->message['error'][] = Text::sprintf(
