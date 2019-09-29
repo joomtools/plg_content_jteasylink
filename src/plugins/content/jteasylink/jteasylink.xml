@@ -8,7 +8,7 @@
 	<copyright>Copyright ##YEAR## JoomTools.de. All rights reserved.</copyright>
 	<license>GPL v3</license>
 	<version>##VERSION##</version>
-	<description>PLG_CONTENT_JTEASYLINK_DESC,##VERSION##</description>
+	<description>PLG_CONTENT_JTEASYLINK_DESC,PLG_CONTENT_JTEASYLINK_AFFILIATE,##VERSION##,</description>
 	<files>
 		##FILES##
 	</files>
