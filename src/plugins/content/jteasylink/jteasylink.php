@@ -81,9 +81,9 @@ class PlgContentJteasylink extends CMSPlugin
 	 */
 	private $allowedSkiplinksCalls = [
 		'dse' => 'PLG_CONTENT_JTEASYLINK_CALL_DSE_LABEL',
-//		'imp' => 'PLG_CONTENT_JTEASYLINK_CALL_IMP_LABEL',
-//		'agb' => 'PLG_CONTENT_JTEASYLINK_CALL_AGB_LABEL',
-//		'wbl' => 'PLG_CONTENT_JTEASYLINK_CALL_WBL_LABEL',
+		'imp' => 'PLG_CONTENT_JTEASYLINK_CALL_IMP_LABEL',
+		'agb' => 'PLG_CONTENT_JTEASYLINK_CALL_AGB_LABEL',
+		'wbl' => 'PLG_CONTENT_JTEASYLINK_CALL_WBL_LABEL',
 	];
 	/**
 	 * Allowed document calls
@@ -226,8 +226,8 @@ class PlgContentJteasylink extends CMSPlugin
 				if (empty($this->allowedSkiplinksCalls[$callType]))
 				{
 					$this->message['error'][] = Text::sprintf(
-						'PLG_CONTENT_JTEASYLINK_ERROR_NO_DOKUMENT_EXISTS',
-						'skiplinks,' . $callType
+						'PLG_CONTENT_JTEASYLINK_ERROR_NO_SKIPLINKS_EXISTS',
+						$callType
 					);
 
 					continue;
