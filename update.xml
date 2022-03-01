@@ -40,6 +40,6 @@
 		<sha512>d584657dd1df3a63ff5ee6b13b2cdaa9c4987546e3d5c4e86d7189e7f10c6d44a71d079548d91e1b81a9673634b5a201581bf0de8f811d09f6b5df4d70279a9d</sha512>
 		<maintainer>Guido De Gobbis</maintainer>
 		<php_minimum>5.6</php_minimum>
-		<targetplatform name="joomla" version="4.0"/>
+		<targetplatform name="joomla" version="4.[01]"/>
 	</update>
 </updates>
