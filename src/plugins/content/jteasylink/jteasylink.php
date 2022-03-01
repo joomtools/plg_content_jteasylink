@@ -6,11 +6,12 @@
  * @author       Guido De Gobbis <support@joomtools.de>
  * @copyright    2019 JoomTools.de - All rights reserved.
  * @license      GNU General Public License version 3 or later
-**/
+ **/
 
 // No direct access
 defined('_JEXEC') or die;
 
+use Joomla\CMS\Application\CMSApplication;
 use Joomla\CMS\Factory;
 use Joomla\CMS\Filesystem\File;
 use Joomla\CMS\Filesystem\Folder;
@@ -36,77 +37,91 @@ use Joomla\Registry\Registry;
 class PlgContentJteasylink extends CMSPlugin
 {
 	/**
+	 * Set force clear by URL once
+	 *
+	 * @var    boolean
+	 * @since  1.0.7
+	 */
+	private static $forceCleared = false;
+
+	/**
 	 * Set css once
 	 *
-	 * @var     boolean
-	 * @since   1.0.0
+	 * @var    boolean
+	 * @since  1.0.0
 	 */
-	static $cssSet = false;
+	private static $cssSet = false;
+
 	/**
 	 * Affects constructor behavior. If true, language files will be loaded automatically.
 	 *
-	 * @var     boolean
-	 * @since   1.0.0
+	 * @var    boolean
+	 * @since  1.0.0
 	 */
 	protected $autoloadLanguage = true;
+
 	/**
 	 * Global application object
 	 *
-	 * @var     JApplication
-	 * @since   1.0.0
+	 * @var    CMSApplication
+	 * @since  1.0.0
 	 */
 	protected $app;
+
 	/**
 	 * Supported languages from Easyrechtssicher
 	 *
-	 * @var     array
-	 * @since   1.0.0
+	 * @var    array
+	 * @since  1.0.0
 	 */
-	private $supportedLangguages = [
+	private $supportedLanguages = array(
 		'de',
 		'en',
-	];
+	);
+
 	/**
 	 * Collection point for error messages
 	 *
-	 * @var     array
-	 * @since   1.0.0
+	 * @var    array
+	 * @since  1.0.0
 	 */
-	private $message = [];
+	private $message = array();
+
 	/**
 	 * Allowed skiplinks calls
 	 *
-	 * @var     array
-	 * @since   1.0.0
+	 * @var    array
+	 * @since  1.0.0
 	 */
-	private $allowedSkiplinksCalls = [
+	private $allowedSkiplinksCalls = array(
 		'dse' => 'PLG_CONTENT_JTEASYLINK_CALL_DSE_LABEL',
 		'imp' => 'PLG_CONTENT_JTEASYLINK_CALL_IMP_LABEL',
 		'agb' => 'PLG_CONTENT_JTEASYLINK_CALL_AGB_LABEL',
 		'wbl' => 'PLG_CONTENT_JTEASYLINK_CALL_WBL_LABEL',
-	];
+	);
+
 	/**
 	 * Allowed document calls
 	 *
-	 * @var     array
-	 * @since   1.0.0
+	 * @var    array
+	 * @since  1.0.0
 	 */
-	private $allowedDocumentCalls = [
+	private $allowedDocumentCalls = array(
 		'dse' => 'PLG_CONTENT_JTEASYLINK_CALL_DSE_LABEL',
 		'imp' => 'PLG_CONTENT_JTEASYLINK_CALL_IMP_LABEL',
 		'agb' => 'PLG_CONTENT_JTEASYLINK_CALL_AGB_LABEL',
 		'wbl' => 'PLG_CONTENT_JTEASYLINK_CALL_WBL_LABEL',
-	];
+	);
+
 	/**
 	 * Options for HttpFactory request
 	 *
-	 * @var     array
-	 * @since   1.0.1
+	 * @var    array
+	 * @since  1.0.1
 	 */
-	private $options = [
+	private $options = array(
 		'userAgent' => 'JT-Easylink Joomla Plugin!',
-	];
-
+	);
 
 	/**
 	 * onContentPrepare
@@ -116,25 +131,36 @@ class PlgContentJteasylink extends CMSPlugin
 	 * @param   mixed    $params   The article params
 	 * @param   integer  $page     The 'page' number
 	 *
-	 * @return   void
-	 * @since    1.0.0
+	 * @return  void
+	 * @since   1.0.0
 	 */
 	public function onContentPrepare($context, &$article, &$params, $page = 0)
 	{
+		$input           = $this->app->input;
+		$urlCallType     = strtolower($input->get('jteasylink', null, 'alnum'));
+		$allowedUrlCalls = array_keys($this->allowedDocumentCalls);
+		$urlToken        = $input->get('token', null, 'alnum');
+		$calledByUrl     = !empty($urlCallType)
+			&& !empty($urlToken)
+			&& in_array($urlCallType, $allowedUrlCalls)
+			&& self::$forceCleared === false;
+
 		// Don't run in administration Panel or when the content is being indexed
-		if (strpos($article->text, '{jteasylink') === false
-			|| $this->app->isClient('administrator') === true
+		if ($this->app->isClient('administrator') === true
+			|| $calledByUrl === false
+			&& strpos($article->text, '{jteasylink') === false
 			|| $context == 'com_finder.indexer'
 			|| $this->app->input->getCmd('layout') == 'edit')
 		{
 			return;
 		}
+
 		// Set starttime for process total time
 		$startTime = microtime(1);
 
-		$debug  = $this->params->get('debug', 0) == '0' ? true : false;
+		$debug = $this->params->get('debug', 0) == '0' ? true : false;
 
-		if (Factory::getConfig()->get('debug', false))
+		if (Factory::getConfig()->get('debug'))
 		{
 			$debug = true;
 		}
@@ -152,10 +178,10 @@ class PlgContentJteasylink extends CMSPlugin
 		$cachePath   = JPATH_CACHE . '/_jteasylink';
 		$cacheTime   = (int) $this->params->get('cachetime', 60) * 60;
 		$methode     = $this->params->get('methode', 'html');
-		$apiKey      = trim($this->params->get('apikey', ''));
+		$apiKey      = trim($this->params->get('apikey'));
 		$defaultLang = $this->params->get('language', 'de');
 		$activeLang  = strtolower(substr(Factory::getLanguage()->getTag(), 0, 2));
-		$language    = in_array($activeLang, $this->supportedLangguages) ? $activeLang : $defaultLang;
+		$language    = in_array($activeLang, $this->supportedLanguages) ? $activeLang : $defaultLang;
 		$domain      = Uri::getInstance()->getHost();
 
 		if ($debug)
@@ -178,7 +204,7 @@ class PlgContentJteasylink extends CMSPlugin
 			return;
 		}
 
-		if(strlen($apiKey) == 26)
+		if (strlen($apiKey) == 26)
 		{
 			$apiKey = substr($apiKey, 0, -1);
 		}
@@ -186,12 +212,45 @@ class PlgContentJteasylink extends CMSPlugin
 		// Add identifier for usage of Joomla!
 		$apiKey .= 'J';
 
-		if(strlen($apiKey) != 26)
+		if (strlen($apiKey) != 26)
 		{
 			$this->app->enqueueMessage(
 				Text::_('PLG_CONTENT_JTEASYLINK_WRONG_APIKEY'),
 				'error'
 			);
+
+			return;
+		}
+
+		// Clear cache by URL parameters
+		$urClearCache = filter_var(
+			$this->app->input->get('clear', 0, 'int'),
+			FILTER_VALIDATE_BOOLEAN
+		);
+
+		if ($calledByUrl)
+		{
+			if (strlen($urlToken) == 26)
+			{
+				$urlToken = substr($urlToken, 0, -1);
+			}
+
+			// Add identifier for usage of Joomla!
+			$urlToken .= 'J';
+
+			if ($urClearCache && $apiKey === $urlToken)
+			{
+				foreach ($this->supportedLanguages as $language)
+				{
+					$keyName   = $language . '_' . $urlCallType;
+					$key       = md5(serialize($keyName));
+					$cacheFile = $cachePath . '/' . $key . '-cache-' . $keyName . '.php';
+
+					File::delete($cacheFile);
+				}
+			}
+
+			self::$forceCleared = true;
 
 			return;
 		}
@@ -208,126 +267,126 @@ class PlgContentJteasylink extends CMSPlugin
 
 		$plgCalls = $this->getPlgCalls($article->text);
 
-		foreach ($plgCalls[0] as $key => $plgCall)
+		if (!empty($plgCalls[0]))
 		{
-			$skiplinks = false;
-			$fileName  = '';
-			$callType  = trim($plgCalls[1][$key][0]);
-
-			if ($callType == 'skiplinks')
+			foreach ($plgCalls[0] as $key => $plgCall)
 			{
-				$skiplinks = true;
-				$fileName  = 'skiplinks_';
+				$skiplinks = false;
+				$fileName  = '';
+				$callType  = trim($plgCalls[1][$key][0]);
 
-				array_shift($plgCalls[1][$key]);
+				if ($callType == 'skiplinks')
+				{
+					$skiplinks = true;
+					$fileName  = 'skiplinks_';
 
-				$callType = trim($plgCalls[1][$key][0]);
+					array_shift($plgCalls[1][$key]);
 
-				if (empty($this->allowedSkiplinksCalls[$callType]))
+					$callType = trim($plgCalls[1][$key][0]);
+
+					if (empty($this->allowedSkiplinksCalls[$callType]))
+					{
+						$this->message['error'][] = Text::sprintf(
+							'PLG_CONTENT_JTEASYLINK_ERROR_NO_SKIPLINKS_EXISTS',
+							$callType
+						);
+
+						continue;
+					}
+				}
+
+				if (empty($this->allowedDocumentCalls[$callType]))
 				{
 					$this->message['error'][] = Text::sprintf(
-						'PLG_CONTENT_JTEASYLINK_ERROR_NO_SKIPLINKS_EXISTS',
+						'PLG_CONTENT_JTEASYLINK_ERROR_NO_DOKUMENT_EXISTS',
 						$callType
 					);
 
 					continue;
 				}
-			}
 
-			if (empty($this->allowedDocumentCalls[$callType]))
-			{
-				$this->message['error'][] = Text::sprintf(
-					'PLG_CONTENT_JTEASYLINK_ERROR_NO_DOKUMENT_EXISTS',
-					$callType
-				);
+				$fileName .= $callType;
 
-				continue;
-			}
-
-			$fileName .= $callType . '.html';
-
-			if (!empty($plgCalls[1][$key][1]))
-			{
-				// Get preferred language from plugin call
-				$callLang = trim($plgCalls[1][$key][1]);
-
-				// Validate if language is supported
-				$supportedLangguages = in_array($callLang, $this->supportedLangguages) ? true : false;
-
-				// Set site language or default language if preferred language is not supported
-				$language = $supportedLangguages ? $callLang : $language;
-
-				// Define error message if language is not supported
-				if ($supportedLangguages === false)
+				if (!empty($plgCalls[1][$key][1]))
 				{
-					$this->message['warning'][] = Text::sprintf(
-						'PLG_CONTENT_JTEASYLINK_WARNING_LANGUAGE',
-						$callLang,
-						$language
-					);
+					// Get preferred language from plugin call
+					$callLang = trim($plgCalls[1][$key][1]);
+
+					// Define error message if language is not supported
+					if (!in_array($callLang, $this->supportedLanguages))
+					{
+						$this->message['warning'][] = Text::sprintf(
+							'PLG_CONTENT_JTEASYLINK_WARNING_LANGUAGE',
+							$callLang,
+							$language
+						);
+					}
+
+					// Set site language or default language if preferred language is not supported
+					$language = in_array($callLang, $this->supportedLanguages) ? $callLang : $language;
 				}
-			}
 
-			$keyName   = $language . '_' . File::stripExt($fileName);
-			$key       = md5(serialize($keyName));
-			$cacheFile = $cachePath . '/' . $key . '-cache-' . $keyName . '.php';
+				$keyName   = $language . '_' . $fileName;
+				$key       = md5(serialize($keyName));
+				$cacheFile = $cachePath . '/' . $key . '-cache-' . $keyName . '.php';
 
-			if (!Folder::exists(dirname($cacheFile)))
-			{
-				Folder::create(dirname($cacheFile));
-			}
-
-			if ($useCacheFile = File::exists($cacheFile))
-			{
-				$useCacheFile = $this->getFileTime($cacheFile, $cacheTime);
-			}
-
-			if ($debug)
-			{
-				$useCacheFile = false;
-			}
-
-			if($useCacheFile === false)
-			{
-				// Pause prevent DB#1062 Duplicate entry database error (primary key)
-				sleep(1);
-
-				$easylawServerUrl = 'https://er' . $callType . '.net/'
-					. $apiKey . '/'
-					. $language . '/'
-					. $domain . '.'
-					. $methode;
-
-				if ($methode == 'html')
+				if (!Folder::exists(dirname($cacheFile)))
 				{
-					$buffer = $this->getHtml($cacheFile, $easylawServerUrl);
+					Folder::create(dirname($cacheFile));
+				}
+
+				if ($useCacheFile = File::exists($cacheFile))
+				{
+					$useCacheFile = $this->getFileTime($cacheFile, $cacheTime);
+				}
+
+				if ($debug)
+				{
+					$useCacheFile = false;
+				}
+
+				if ($useCacheFile === false)
+				{
+					// Pause prevent DB#1062 Duplicate entry database error (primary key)
+					sleep(1);
+
+					$easylawServerUrl = 'https://er' . $callType . '.net/'
+						. $apiKey . '/'
+						. $language . '/'
+						. $domain . '.'
+						. $methode;
+
+					if ($methode == 'html')
+					{
+						$buffer = $this->getHtml($cacheFile, $easylawServerUrl);
+					}
+					else
+					{
+						$buffer = $this->getJson($cacheFile, $easylawServerUrl, $skiplinks);
+					}
+
+					if (!empty($buffer) && $debug === false)
+					{
+						$this->setCache($cacheFile, $buffer);
+					}
 				}
 				else
 				{
-					$buffer = $this->getJson($cacheFile, $easylawServerUrl, $skiplinks);
+					$buffer = $this->getCache($cacheFile);
 				}
 
-				if (!empty($buffer) && $debug === false)
-				{
-					$this->setCache($cacheFile, $buffer);
-				}
+				$article->text = str_replace($plgCall, $buffer, $article->text);
 			}
-			else
+
+			if ($methode == 'json' && $useCss && self::$cssSet === false)
 			{
-				$buffer = $this->getCache($cacheFile);
+				HTMLHelper::_('stylesheet', 'plg_content_jteasylink/jteasylink.min.css', array('version' => 'auto', 'relative' => true));
+
+				self::$cssSet = true;
 			}
 
-			$article->text = str_replace($plgCall, $buffer, $article->text);
+			$this->removeJoomlaCache($context);
 		}
-
-		if ($methode == 'json' && $useCss && self::$cssSet === false)
-		{
-			HTMLHelper::_('stylesheet', 'plg_content_jteasylink/jteasylink.min.css', array('version' => 'auto', 'relative' => true));
-
-			self::$cssSet = true;
-		}
-
-		$this->removeJoomlaCache($context);
 
 		if ($debug)
 		{
@@ -357,8 +416,8 @@ class PlgContentJteasylink extends CMSPlugin
 	 *
 	 * @param   string  $text  Text with plugin call's
 	 *
-	 * @return   array  All matches found in $text
-	 * @since    1.0.0
+	 * @return  array  All matches found in $text
+	 * @since   1.0.0
 	 */
 	private function getPlgCalls($text)
 	{
@@ -430,13 +489,13 @@ class PlgContentJteasylink extends CMSPlugin
 	 * @param   string  $file       Cachefile with absolute path
 	 * @param   int     $cacheTime  Cachetime setup in params
 	 *
-	 * @return   bool  true if cached file is up to date
-	 * @since    1.0.0
+	 * @return  boolean  true if cached file is up to date
+	 * @since   1.0.0
 	 */
 	private function getFileTime($file, $cacheTime)
 	{
-		$time      = time();
-		$fileTime  = filemtime($file);
+		$time     = time();
+		$fileTime = filemtime($file);
 
 		$control = $time - $fileTime;
 
@@ -454,8 +513,8 @@ class PlgContentJteasylink extends CMSPlugin
 	 * @param   string  $cacheFile          Cachefile with absolute path
 	 * @param   string  $easylinkServerUrl  EasyLaw Server-URL for API-Call
 	 *
-	 * @return   string
-	 * @since    1.0.0
+	 * @return  string
+	 * @since   1.0.0
 	 */
 	private function getHtml($cacheFile, $easylinkServerUrl)
 	{
@@ -465,7 +524,7 @@ class PlgContentJteasylink extends CMSPlugin
 
 		if ($data->code >= 200 && $data->code < 400)
 		{
-			$error = !preg_match('@<body[^>]*>(.*?)<\/body>@is' ,$data->body, $matches);
+			$error = !preg_match('@<body[^>]*>(.*?)<\/body>@is', $data->body, $matches);
 
 			if ($error === false)
 			{
@@ -484,14 +543,42 @@ class PlgContentJteasylink extends CMSPlugin
 	}
 
 	/**
+	 * Set message to error buffer
+	 *
+	 * @param   string  $cacheFile   Cachefile with absolute path
+	 * @param   int     $statusCode  Response status code
+	 * @param   array   $message     Error message
+	 *
+	 * @return  void
+	 * @since   1.0.0
+	 */
+	private function setErrorMessage($cacheFile, $statusCode, array $message)
+	{
+		$fileName     = basename($cacheFile);
+		$documentCall = File::stripExt($fileName);
+
+		if (!empty($this->allowedDocumentCalls[$documentCall]))
+		{
+			$documentCall = Text::_($this->allowedDocumentCalls[$documentCall]);
+		}
+
+		$this->message['error'][] = Text::sprintf(
+			'PLG_CONTENT_JTEASYLINK_ERROR_NO_CACHE_SERVER',
+			$documentCall,
+			$statusCode,
+			implode('<br />', $message)
+		);
+	}
+
+	/**
 	 * Load JSON file from Server or get cached file
 	 *
-	 * @param   string  $cacheFile          Cachefile with absolute path
-	 * @param   string  $easylinkServerUrl  EasyLaw Server-URL for API-Call
-	 * @param   bool    $skiplinks
+	 * @param   string   $cacheFile          Cachefile with absolute path
+	 * @param   string   $easylinkServerUrl  EasyLaw Server-URL for API-Call
+	 * @param   boolean  $skiplinks
 	 *
-	 * @return   string
-	 * @since    1.0.0
+	 * @return  string
+	 * @since   1.0.0
 	 */
 	private function getJson($cacheFile, $easylinkServerUrl, $skiplinks = false)
 	{
@@ -536,114 +623,33 @@ class PlgContentJteasylink extends CMSPlugin
 	}
 
 	/**
-	 * Create HTML from rules
+	 * Create skiplinks from Json request
 	 *
-	 * @param   string  $type       Type of call
-	 * @param   array   $rules      Array of rules
-	 * @param   int     $header     Header-Tag numner
-	 * @param   string  $container  Container-Tag
+	 * @param   object  $json  Request from easyrechtssicher.de
 	 *
-	 * @return   string
-	 * @since    1.0.0
+	 * @return  string
+	 * @throws  \Exception
+	 * @since   1.0.3
 	 */
-	public function formatRules($type, $rules, $header, $container)
+	private function createSkiplinksContent($json)
 	{
-		$html = '';
+		$theme             = Factory::getApplication()->getTemplate();
+		$themeOverridePath = JPATH_THEMES . '/' . $theme . '/html/plg_' . $this->_type . '_' . $this->_name;
+		$layoutBasePath    = JPATH_PLUGINS . '/' . $this->_type . '/' . $this->_name . '/tmpl';
 
-		foreach ($rules as $rule)
-		{
-			$cTag  = ($rule->level > 2) ? 'div' : $container;
-			$level = (int) $rule->level - 1;
-			$level = ($level < 1) ? 1 : $level;
-			$hTag  = $header + (int) $rule->level - 2;
-			$hTag  = ($hTag < 1) ? 1 : $hTag;
-			$hTag  = ($hTag > 6) ? 6 : $hTag;
+		$renderer = new FileLayout('skiplinks', $layoutBasePath, array('component' => 'none'));
+		$renderer->addIncludePath($themeOverridePath);
 
-			$html .= '<' . $cTag . ' id="' . $type . '_' . $rule->name
-				. '" class="' . $rule->name . ' level' . $level . '">';
-
-			if (!empty($rule->header))
-			{
-				$html .= '<h' . $hTag . '>'
-					. strip_tags($rule->header)
-					. '</h' . $hTag . '>';
-			}
-
-			$html .= '<p>' . $rule->content . '</p>';
-
-			if (!empty($rule->rules) && is_array($rule->rules))
-			{
-				$html .= $this->formatRules($type, $rule->rules, $header, $container);
-			}
-
-			$html .= '</' . $cTag . '>';
-		}
-
-		return $html;
-	}
-
-	/**
-	 * Get content from cache file
-	 *
-	 * @param   string  $cacheFile  Path to cache file
-	 *
-	 * @return   string
-	 * @since    1.0.0
-	 */
-	private function getCache($cacheFile)
-	{
-		if (file_exists($cacheFile))
-		{
-			$cache = @file_get_contents($cacheFile);
-
-			return str_replace('<?php die("Access Denied"); ?>', '', $cache);
-		}
-
-		return '';
-	}
-
-	/**
-	 * Write content to cache file
-	 *
-	 * @param   string  $cacheFile  Cachefile with absolute path
-	 * @param   string  $html       Content to write to cache file
-	 *
-	 * @return   void
-	 * @since    1.0.0
-	 */
-	private function setCache($cacheFile, $html)
-	{
-		JFile::delete($cacheFile);
-		$cache = '<?php die("Access Denied"); ?>' . $html;
-		JFile::write($cacheFile, $cache);
-	}
-
-	/**
-	 * Set message to error buffer
-	 *
-	 * @param   string  $cacheFile   Cachefile with absolute path
-	 * @param   int     $statusCode  Response status code
-	 * @param   array   $message     Error message
-	 *
-	 * @return   void
-	 * @since    1.0.0
-	 */
-	private function setErrorMessage($cacheFile, $statusCode, array $message)
-	{
-		$fileName     = basename($cacheFile);
-		$documentCall = File::stripExt($fileName);
-
-		if (!empty($this->allowedDocumentCalls[$documentCall]))
-		{
-			$documentCall = Text::_($this->allowedDocumentCalls[$documentCall]);
-		}
-
-		$this->message['error'][] = Text::sprintf(
-			'PLG_CONTENT_JTEASYLINK_ERROR_NO_CACHE_SERVER',
-			$documentCall,
-			$statusCode,
-			implode('<br />', $message)
+		$displayData = array(
+			'type'      => $json->object,
+			'container' => $this->params->get('skiplinksCtag', 'nav'),
+			'rules'     => $json->rules,
 		);
+
+		$content = $renderer->render($displayData);
+		// file_put_contents($cacheFile . '.json', $data->body);
+
+		return $content;
 	}
 
 	/**
@@ -651,8 +657,8 @@ class PlgContentJteasylink extends CMSPlugin
 	 *
 	 * @param   object  $json  Request from easyrechtssicher.de
 	 *
-	 * @return   string
-	 * @since    1.0.3
+	 * @return  string
+	 * @since   1.0.3
 	 */
 	private function createJsonContent($json)
 	{
@@ -702,33 +708,86 @@ class PlgContentJteasylink extends CMSPlugin
 	}
 
 	/**
-	 * Create skiplinks from Json request
+	 * Create HTML from rules
 	 *
-	 * @param   object  $json  Request from easyrechtssicher.de
+	 * @param   string  $type       Type of call
+	 * @param   array   $rules      Array of rules
+	 * @param   int     $header     Header-Tag numner
+	 * @param   string  $container  Container-Tag
 	 *
-	 * @return   string
-	 * @since    1.0.3
-	 * @throws   \Exception
+	 * @return  string
+	 * @since   1.0.0
 	 */
-	private function createSkiplinksContent($json)
+	public function formatRules($type, $rules, $header, $container)
 	{
-		$theme             = Factory::getApplication()->getTemplate();
-		$themeOverridePath = JPATH_THEMES . '/' . $theme . '/html/plg_' . $this->_type . '_' . $this->_name;
-		$layoutBasePath    = JPATH_PLUGINS . '/' . $this->_type . '/' . $this->_name . '/tmpl';
+		$html = '';
 
-		$renderer = new FileLayout('skiplinks', $layoutBasePath, array('component' => 'none'));
-		$renderer->addIncludePath($themeOverridePath);
+		foreach ($rules as $rule)
+		{
+			$cTag  = ($rule->level > 2) ? 'div' : $container;
+			$level = (int) $rule->level - 1;
+			$level = ($level < 1) ? 1 : $level;
+			$hTag  = $header + (int) $rule->level - 2;
+			$hTag  = ($hTag < 1) ? 1 : $hTag;
+			$hTag  = ($hTag > 6) ? 6 : $hTag;
 
-		$displayData = array(
-			'type'      => $json->object,
-			'container' => $this->params->get('skiplinksCtag', 'nav'),
-			'rules'     => $json->rules,
-		);
+			$html .= '<' . $cTag . ' id="' . $type . '_' . $rule->name
+				. '" class="' . $rule->name . ' level' . $level . '">';
 
-		$content = $renderer->render($displayData);
-		// file_put_contents($cacheFile . '.json', $data->body);
+			if (!empty($rule->header))
+			{
+				$html .= '<h' . $hTag . '>'
+					. strip_tags($rule->header)
+					. '</h' . $hTag . '>';
+			}
 
-		return $content;
+			$html .= '<p>' . $rule->content . '</p>';
+
+			if (!empty($rule->rules) && is_array($rule->rules))
+			{
+				$html .= $this->formatRules($type, $rule->rules, $header, $container);
+			}
+
+			$html .= '</' . $cTag . '>';
+		}
+
+		return $html;
+	}
+
+	/**
+	 * Write content to cache file
+	 *
+	 * @param   string  $cacheFile  Cachefile with absolute path
+	 * @param   string  $html       Content to write to cache file
+	 *
+	 * @return  void
+	 * @since   1.0.0
+	 */
+	private function setCache($cacheFile, $html)
+	{
+		File::delete($cacheFile);
+		$cache = '<?php die("Access Denied"); ?>' . $html;
+		File::write($cacheFile, $cache);
+	}
+
+	/**
+	 * Get content from cache file
+	 *
+	 * @param   string  $cacheFile  Path to cache file
+	 *
+	 * @return  string
+	 * @since   1.0.0
+	 */
+	private function getCache($cacheFile)
+	{
+		if (file_exists($cacheFile))
+		{
+			$cache = @file_get_contents($cacheFile);
+
+			return str_replace('<?php die("Access Denied"); ?>', '', $cache);
+		}
+
+		return '';
 	}
 
 	/**
@@ -736,8 +795,8 @@ class PlgContentJteasylink extends CMSPlugin
 	 *
 	 * @param   string  $context
 	 *
-	 * @return   void
-	 * @since    1.0.3
+	 * @return  void
+	 * @since   1.0.3
 	 */
 	private function removeJoomlaCache($context)
 	{
@@ -751,12 +810,12 @@ class PlgContentJteasylink extends CMSPlugin
 			return;
 		}
 
-		$key         = (array) JUri::getInstance()->toString();
+		$key         = (array) Uri::getInstance()->toString();
 		$key         = md5(serialize($key));
 		$group       = strstr($context, '.', true);
 		$cacheGroups = array();
 
-		if($cacheIsActive)
+		if ($cacheIsActive)
 		{
 			$cacheGroups = array(
 				$group        => 'callback',
@@ -765,14 +824,14 @@ class PlgContentJteasylink extends CMSPlugin
 			);
 		}
 
-		if($cachePagePlugin)
+		if ($cachePagePlugin)
 		{
 			$cacheGroups['page'] = 'callback';
 		}
 
 		foreach ($cacheGroups as $group => $handler)
 		{
-			$cache = JFactory::getCache($group, $handler);
+			$cache = Factory::getCache($group, $handler);
 			$cache->cache->remove($key);
 			$cache->cache->setCaching(false);
 		}
