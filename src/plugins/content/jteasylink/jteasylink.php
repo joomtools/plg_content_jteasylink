@@ -17,6 +17,7 @@ use Joomla\CMS\Filesystem\File;
 use Joomla\CMS\Filesystem\Folder;
 use Joomla\CMS\HTML\HTMLHelper;
 use Joomla\CMS\Http\HttpFactory;
+use Joomla\CMS\Language\LanguageFactoryInterface;
 use Joomla\CMS\Language\Text;
 use Joomla\CMS\Layout\FileLayout;
 use Joomla\CMS\Plugin\CMSPlugin;
@@ -75,8 +76,21 @@ class PlgContentJteasylink extends CMSPlugin
      * @since  1.0.0
      */
     private $supportedLanguages = array(
-        'de',
-        'en',
+       'dse' => [
+            'de',
+            'en',
+        ],
+        'imp' => [
+            'de',
+            'en',
+        ],
+        'fan' => [
+            'de',
+            'en',
+        ],
+        'wbl' => [
+            'de',
+        ],
     );
 
     /**
@@ -96,7 +110,7 @@ class PlgContentJteasylink extends CMSPlugin
     private $allowedSkiplinksCalls = array(
         'dse' => 'PLG_CONTENT_JTEASYLINK_CALL_DSE_LABEL',
         'imp' => 'PLG_CONTENT_JTEASYLINK_CALL_IMP_LABEL',
-        'agb' => 'PLG_CONTENT_JTEASYLINK_CALL_AGB_LABEL',
+        'fan' => 'PLG_CONTENT_JTEASYLINK_CALL_FAN_LABEL',
         'wbl' => 'PLG_CONTENT_JTEASYLINK_CALL_WBL_LABEL',
     );
 
@@ -109,8 +123,21 @@ class PlgContentJteasylink extends CMSPlugin
     private $allowedDocumentCalls = array(
         'dse' => 'PLG_CONTENT_JTEASYLINK_CALL_DSE_LABEL',
         'imp' => 'PLG_CONTENT_JTEASYLINK_CALL_IMP_LABEL',
-        'agb' => 'PLG_CONTENT_JTEASYLINK_CALL_AGB_LABEL',
+        'fan' => 'PLG_CONTENT_JTEASYLINK_CALL_FAN_LABEL',
         'wbl' => 'PLG_CONTENT_JTEASYLINK_CALL_WBL_LABEL',
+    );
+
+    /**
+     * Allowed document calls
+     *
+     * @var    array
+     * @since  1.0.0
+     */
+    private $documentCallUrls = array(
+        'dse' => 'https://erdse.net',
+        'imp' => 'https://erimp.net',
+        'fan' => 'https://easyrechtssicher.de/api/download/fan',
+        'wbl' => 'https://erwbl.net',
     );
 
     /**
@@ -178,9 +205,6 @@ class PlgContentJteasylink extends CMSPlugin
         $cacheTime   = (int) $this->params->get('cachetime', 60) * 60;
         $methode     = $this->params->get('methode', 'html');
         $apiKey      = trim($this->params->get('apikey'));
-        $defaultLang = $this->params->get('language', 'de');
-        $activeLang  = strtolower(substr(Factory::getLanguage()->getTag(), 0, 2));
-        $language    = in_array($activeLang, $this->supportedLanguages) ? $activeLang : $defaultLang;
         $domain      = Uri::getInstance()->getHost();
 
         if ($debug) {
@@ -232,7 +256,7 @@ class PlgContentJteasylink extends CMSPlugin
             $urlToken .= 'J';
 
             if ($urClearCache && $apiKey === $urlToken) {
-                foreach ($this->supportedLanguages as $language) {
+                foreach ($this->supportedLanguages[$urlCallType] as $language) {
                     $keyName   = $language . '_' . $urlCallType;
                     $key       = md5(serialize($keyName));
                     $cacheFile = $cachePath . '/' . $key . '-cache-' . $keyName . '.php';
@@ -290,24 +314,14 @@ class PlgContentJteasylink extends CMSPlugin
                 }
 
                 $fileName .= $callType;
+                $callLang = null;
 
                 if (!empty($plgCalls[1][$key][1])) {
                     // Get preferred language from plugin call
                     $callLang = trim($plgCalls[1][$key][1]);
-
-                    // Define error message if language is not supported
-                    if (!in_array($callLang, $this->supportedLanguages)) {
-                        $this->message['warning'][] = Text::sprintf(
-                            'PLG_CONTENT_JTEASYLINK_WARNING_LANGUAGE',
-                            $callLang,
-                            $language
-                        );
-                    }
-
-                    // Set site language or default language if preferred language is not supported
-                    $language = in_array($callLang, $this->supportedLanguages) ? $callLang : $language;
                 }
 
+                $language    = $this->getLanguageToUseForDocumentCall($callType, $callLang);
                 $keyName   = $language . '_' . $fileName;
                 $key       = md5(serialize($keyName));
                 $cacheFile = $cachePath . '/' . $key . '-cache-' . $keyName . '.php';
@@ -328,7 +342,7 @@ class PlgContentJteasylink extends CMSPlugin
                     // Pause prevent DB#1062 Duplicate entry database error (primary key)
                     sleep(1);
 
-                    $easylawServerUrl = 'https://er' . $callType . '.net/'
+                    $easylawServerUrl = $this->documentCallUrls[$callType] . '/'
                         . $apiKey . '/'
                         . $language . '/'
                         . $domain . '.'
@@ -492,7 +506,7 @@ class PlgContentJteasylink extends CMSPlugin
             }
         }
 
-        $this->setErrorMessage($cacheFile, (int) $data->code, array($data->body));
+        $this->setServerErrorMessage($cacheFile, (int) $data->code, array($data->body));
 
         return '';
     }
@@ -507,7 +521,7 @@ class PlgContentJteasylink extends CMSPlugin
      * @return  void
      * @since   1.0.0
      */
-    private function setErrorMessage($cacheFile, $statusCode, array $message)
+    private function setServerErrorMessage($cacheFile, $statusCode, array $message)
     {
         $fileName     = basename($cacheFile);
         $documentCall = File::stripExt($fileName);
@@ -567,7 +581,7 @@ class PlgContentJteasylink extends CMSPlugin
             return $this->createJsonContent($result);
         }
 
-        $this->setErrorMessage($cacheFile, (int) $data->code, $message);
+        $this->setServerErrorMessage($cacheFile, (int) $data->code, $message);
 
         return '';
     }
@@ -778,5 +792,68 @@ class PlgContentJteasylink extends CMSPlugin
             $cache->cache->remove($key);
             $cache->cache->setCaching(false);
         }
+    }
+
+    /**
+     * Get the language string for the document call
+     *
+     * @param   string  $callType       The document call
+     * @param   string  $calledLanguage The desired language (default: de)
+     *
+     * @return  string
+     * @since   __DEPLOY_VERSION__
+     */
+    private function getLanguageToUseForDocumentCall($callType, $calledLanguage = null) {
+        $error                 = [];
+        $joomlaActiveLanguage = strtolower(substr(Factory::getApplication()->getLanguage()->getTag(), 0, 2));
+        $pluginDefaultLanguage = $this->params->get('language', 'de');
+
+        if (!is_null($calledLanguage)) {
+            $language = $calledLanguage;
+
+            if (!in_array($calledLanguage, $this->supportedLanguages[$callType])) {
+                $error[] = [
+                    'PLG_CONTENT_JTEASYLINK_WARNING_PLG_CALL_LANGUAGE',
+                        $calledLanguage,
+                        $joomlaActiveLanguage,
+                ];
+            }
+        }
+
+        if (is_null($calledLanguage) || !empty($error)) {
+            $language = $joomlaActiveLanguage;
+
+            if (!in_array($joomlaActiveLanguage, $this->supportedLanguages[$callType])) {
+                $error[] = [
+                    'PLG_CONTENT_JTEASYLINK_WARNING_JOOMLA_ACTIVE_LANGUAGE',
+                        $joomlaActiveLanguage,
+                        $pluginDefaultLanguage,
+                ];
+
+                $language = $pluginDefaultLanguage;
+
+                if (!in_array($pluginDefaultLanguage, $this->supportedLanguages[$callType])) {
+                    $language = 'de';
+
+                    $error[] = [
+                        'PLG_CONTENT_JTEASYLINK_WARNING_PLG_DEFAULT_LANGUAGE',
+                            $pluginDefaultLanguage,
+                            $language,
+                    ];
+                }
+            }
+        }
+
+        if (!empty($error)) {
+            foreach ($error as $item) {
+                $this->message['warning'][] = Text::sprintf(
+                    $item[0],
+                    $item[1],
+                    $item[2]
+                );
+            }
+        }
+
+        return $language;
     }
 }
