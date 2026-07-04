@@ -1,102 +1,137 @@
 <?php
+
 /**
  * This is project's console commands configuration for Robo task runner.
  *
  * Download robo.phar from http://robo.li/robo.phar and type in the root of the repo: $ php robo.phar
  * Or do: $ composer update, and afterwards you will be able to execute robo like $ php vendor/bin/robo
  *
- * @see http://robo.li/
+ * @package     Joomla.Site
+ * @subpackage  RoboFile
+ *
+ * @copyright   Copyright (C) 2005 - 2016 Open Source Matters, Inc. All rights reserved.
+ * @license     GNU General Public License version 2 or later; see LICENSE.txt
  */
 
-use Joomla\Jorobo\Tasks\loadTasks;
+use Joomla\Jorobo\Tasks\Tasks as loadReleaseTasks;
+use Robo\Tasks;
 
-if (!defined('JPATH_BASE'))
-{
-	define('JPATH_BASE', __DIR__);
+if (!defined('GLOB_BRACE')) {
+    define('GLOB_BRACE', 0);
 }
 
-// PSR-4 Autoload by composer
-require_once JPATH_BASE . '/vendor/autoload.php';
+require_once 'vendor/autoload.php';
 
-class RoboFile extends \Robo\Tasks
+if (!defined('JPATH_BASE')) {
+    define('JPATH_BASE', __DIR__);
+}
+
+/**
+ * Modern php task runner for Joomla! Browser Automated Tests execution
+ *
+ * @package  RoboFile
+ *
+ * @since    1.0
+ */
+class RoboFile extends Tasks
 {
-	use loadTasks;
+    // Load tasks from composer, see composer.json
+    use loadReleaseTasks;
 
-	/**
-	 * Initialize Robo
-	 */
-	public function __construct()
-	{
-		$this->stopOnFail(true);
-	}
+    /**
+     * Constructor
+     */
+    public function __construct()
+    {
+        // Set default timezone (so no warnings are generated if it is not set)
+        date_default_timezone_set('Europe/Berlin');
+        $this->stopOnFail(true);
+    }
 
-	/**
-	 * Build the joomla extension package
-	 *
-	 * @param   array  $params  Additional params
-	 *
-	 * @return  void
-	 */
-	public function build($params = ['dev' => false])
-	{
-		if (!file_exists('jorobo.ini'))
-		{
-			$this->_copy('jorobo.dist.ini', 'jorobo.ini');
-		}
+    /**
+     * Build the joomla extension package
+     *
+     * @param   array  $params  Additional params
+     *
+     * @return  void
+     * @since   __DEPLOY_VERSION__
+     */
+    public function build($params = ['dev' => false])
+    {
+        if (!file_exists('jorobo.ini')) {
+            $this->_copy('jorobo.dist.ini', 'jorobo.ini');
+        }
 
-		// First bump version placeholder in the project
-		(new \Joomla\Jorobo\Tasks\BumpVersion())->run();
+        $this->task(\Joomla\Jorobo\Tasks\Build::class, $params)->run();
+    }
 
-		// Build the extension package
-		(new \Joomla\Jorobo\Tasks\Build($params))->run();
-	}
+    /**
+     * Update copyright headers for this project. (Set the text up in the jorobo.ini)
+     *
+     * @return  void
+     * @since   __DEPLOY_VERSION__
+     */
+    public function headers()
+    {
+        if (!file_exists('jorobo.ini')) {
+            $this->_copy('jorobo.dist.ini', 'jorobo.ini');
+        }
 
-	/**
-	 * Update copyright headers for this project. (Set the text up in the jorobo.ini)
-	 *
-	 * @return  void
-	 */
-	public function headers()
-	{
-		if (!file_exists('jorobo.ini'))
-		{
-			$this->_copy('jorobo.dist.ini', 'jorobo.ini');
-		}
+        $this->task(\Joomla\Jorobo\Tasks\CopyrightHeader::class)->run();
+    }
 
-		(new \Joomla\Jorobo\Tasks\CopyrightHeader())->run();
-	}
+    /**
+     * Update Version __DEPLOY_VERSION__ in Component. (Set the version up in the jorobo.ini)
+     *
+     * @return  void
+     * @since   __DEPLOY_VERSION__
+     */
+    public function bump()
+    {
+        $this->task(\Joomla\Jorobo\Tasks\BumpVersion::class)->run();
+    }
 
-	/**
-	 * Symlink projectfiles from source into target
-	 *
-	 * @param   string  $target  Absolute path to Joomla! root
-	 *
-	 * @return   void
-	 */
-	public function map($target)
-	{
-		if (!file_exists('jorobo.ini'))
-		{
-			$this->_copy('jorobo.dist.ini', 'jorobo.ini');
-		}
+    /**
+     * Map into Joomla installation.
+     *
+     * @param   String  $target  The target joomla instance
+     *
+     * @return  void
+     * @since   __DEPLOY_VERSION__
+     *
+     */
+    public function map($target)
+    {
+        $this->task(\Joomla\Jorobo\Tasks\Map::class, $target)->run();
+    }
 
-		(new \Joomla\Jorobo\Tasks\Map($target))->run();
-	}
+    /**
+     * Generate joomla.asset.json files
+     *
+     * @return  void
+     * @since   __DEPLOY_VERSION__
+     */
+    public function assetJSON()
+    {
+        if (!file_exists('jorobo.ini')) {
+            $this->_copy('jorobo.dist.ini', 'jorobo.ini');
+        }
 
-	/**
-	 * Bump Version placeholder __DEPLOY_VERSION__ in this project. (Set the version up in the jorobo.ini)
-	 *
-	 * @return  void
-	 *
-	 * @since   1.0.0
-	 */
-	public function bump()
-	{
-		if (!file_exists('jorobo.ini'))
-		{
-			$this->_copy('jorobo.dist.ini', 'jorobo.ini');
-		}
+        $this->task(\Joomla\Jorobo\Tasks\AssetJSON::class)->run();
+    }
 
-		(new \Joomla\Jorobo\Tasks\BumpVersion())->run();
-	}
+    /**
+     * Generate/extend changelog.xml
+     *
+     * @return  void
+     * @since   __DEPLOY_VERSION__
+     */
+    public function changelog()
+    {
+        if (!file_exists('jorobo.ini')) {
+            $this->_copy('jorobo.dist.ini', 'jorobo.ini');
+        }
+
+        $this->task(\Joomla\Jorobo\Tasks\Changelog::class)->run();
+    }
 }
